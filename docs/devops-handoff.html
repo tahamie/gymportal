@@ -1,0 +1,793 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GymFlow DevOps Handoff</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #172033;
+        --muted: #63718a;
+        --line: #dce5f2;
+        --panel: rgba(255, 255, 255, 0.78);
+        --panel-strong: rgba(255, 255, 255, 0.92);
+        --blue: #2563eb;
+        --cyan: #0891b2;
+        --green: #15803d;
+        --amber: #b45309;
+        --red: #b91c1c;
+        --shadow: 0 24px 70px rgba(23, 32, 51, 0.12);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--ink);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background:
+          radial-gradient(circle at 12% 4%, rgba(37, 99, 235, 0.16), transparent 30rem),
+          radial-gradient(circle at 88% 10%, rgba(8, 145, 178, 0.15), transparent 28rem),
+          linear-gradient(135deg, #f8fbff 0%, #edf6f1 45%, #f6f8fc 100%);
+        line-height: 1.55;
+      }
+
+      .shell {
+        width: min(1160px, calc(100% - 40px));
+        margin: 0 auto;
+        padding: 42px 0 56px;
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
+        gap: 24px;
+        align-items: stretch;
+        margin-bottom: 24px;
+      }
+
+      .glass {
+        background: var(--panel);
+        border: 1px solid rgba(255, 255, 255, 0.72);
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(22px);
+      }
+
+      .hero-card,
+      .status-card,
+      section {
+        border-radius: 18px;
+      }
+
+      .hero-card {
+        padding: 34px;
+      }
+
+      .eyebrow {
+        margin: 0 0 10px;
+        color: var(--blue);
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+        letter-spacing: 0;
+      }
+
+      h1 {
+        max-width: 760px;
+        font-size: clamp(34px, 5vw, 62px);
+        line-height: 0.98;
+      }
+
+      h2 {
+        font-size: 24px;
+        line-height: 1.2;
+      }
+
+      h3 {
+        font-size: 16px;
+      }
+
+      p {
+        margin: 10px 0 0;
+      }
+
+      .lead {
+        max-width: 760px;
+        color: var(--muted);
+        font-size: 17px;
+      }
+
+      .status-card {
+        padding: 24px;
+        display: grid;
+        align-content: space-between;
+        gap: 18px;
+      }
+
+      .status-list {
+        display: grid;
+        gap: 12px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .status-list li,
+      .mini-card {
+        padding: 14px 16px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.7);
+      }
+
+      .status-label {
+        display: block;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+
+      .status-value {
+        display: block;
+        margin-top: 2px;
+        font-weight: 800;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(12, 1fr);
+        gap: 18px;
+        margin-top: 18px;
+      }
+
+      section {
+        grid-column: span 12;
+        padding: 24px;
+      }
+
+      .half {
+        grid-column: span 6;
+      }
+
+      .third {
+        grid-column: span 4;
+      }
+
+      .section-head {
+        display: flex;
+        gap: 16px;
+        align-items: flex-start;
+        justify-content: space-between;
+        margin-bottom: 18px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .section-head p {
+        max-width: 780px;
+        color: var(--muted);
+      }
+
+      .pill {
+        display: inline-flex;
+        min-height: 28px;
+        align-items: center;
+        justify-content: center;
+        padding: 5px 11px;
+        border-radius: 999px;
+        border: 1px solid rgba(37, 99, 235, 0.2);
+        color: var(--blue);
+        background: rgba(37, 99, 235, 0.08);
+        font-size: 12px;
+        font-weight: 800;
+        white-space: nowrap;
+      }
+
+      .steps {
+        display: grid;
+        gap: 12px;
+        counter-reset: step;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .steps li {
+        position: relative;
+        padding: 14px 16px 14px 52px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--panel-strong);
+      }
+
+      .steps li::before {
+        counter-increment: step;
+        content: counter(step);
+        position: absolute;
+        left: 16px;
+        top: 15px;
+        width: 24px;
+        height: 24px;
+        display: grid;
+        place-items: center;
+        border-radius: 50%;
+        color: white;
+        background: var(--blue);
+        font-size: 12px;
+        font-weight: 900;
+      }
+
+      code,
+      pre {
+        font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      }
+
+      code {
+        padding: 2px 6px;
+        border-radius: 7px;
+        background: rgba(23, 32, 51, 0.07);
+        font-size: 0.92em;
+      }
+
+      pre {
+        overflow: auto;
+        margin: 12px 0 0;
+        padding: 16px;
+        border: 1px solid rgba(23, 32, 51, 0.14);
+        border-radius: 14px;
+        color: #dce7ff;
+        background: #111827;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+
+      pre code {
+        padding: 0;
+        color: inherit;
+        background: transparent;
+        font-size: inherit;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--panel-strong);
+      }
+
+      th,
+      td {
+        padding: 13px 14px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+        font-size: 14px;
+      }
+
+      th {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 900;
+        text-transform: uppercase;
+      }
+
+      tr:last-child td {
+        border-bottom: 0;
+      }
+
+      .callout {
+        margin-top: 14px;
+        padding: 14px 16px;
+        border-radius: 14px;
+        border: 1px solid rgba(180, 83, 9, 0.28);
+        color: #713f12;
+        background: rgba(251, 191, 36, 0.13);
+      }
+
+      .ok {
+        border-color: rgba(21, 128, 61, 0.22);
+        color: #14532d;
+        background: rgba(34, 197, 94, 0.11);
+      }
+
+      .danger {
+        border-color: rgba(185, 28, 28, 0.24);
+        color: #7f1d1d;
+        background: rgba(239, 68, 68, 0.1);
+      }
+
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .mini-card strong {
+        display: block;
+        margin-bottom: 4px;
+      }
+
+      .mini-card span {
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .checklist {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px 18px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .checklist li {
+        position: relative;
+        padding-left: 28px;
+      }
+
+      .checklist li::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 3px;
+        width: 18px;
+        height: 18px;
+        border: 2px solid var(--blue);
+        border-radius: 5px;
+        background: rgba(255, 255, 255, 0.72);
+      }
+
+      footer {
+        margin-top: 18px;
+        color: var(--muted);
+        font-size: 13px;
+        text-align: center;
+      }
+
+      @media (max-width: 860px) {
+        .shell {
+          width: min(100% - 24px, 1160px);
+          padding-top: 24px;
+        }
+
+        .hero,
+        .grid,
+        .cards,
+        .checklist {
+          grid-template-columns: 1fr;
+        }
+
+        .half,
+        .third,
+        section {
+          grid-column: span 1;
+        }
+
+        .hero-card,
+        .status-card,
+        section {
+          padding: 20px;
+        }
+
+        .section-head {
+          display: block;
+        }
+
+        .pill {
+          margin-top: 10px;
+        }
+      }
+
+      @media print {
+        body {
+          background: white;
+        }
+
+        .shell {
+          width: 100%;
+          padding: 0;
+        }
+
+        .glass {
+          box-shadow: none;
+          border-color: #d8dee9;
+          background: white;
+          backdrop-filter: none;
+        }
+
+        pre {
+          white-space: pre-wrap;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <div class="hero">
+        <div class="hero-card glass">
+          <p class="eyebrow">GymFlow MVP Deployment Handoff</p>
+          <h1>DevOps Instructions for App + PostgreSQL Setup</h1>
+          <p class="lead">
+            This document explains how to deploy the GymFlow frontend, backend, and database for demo/UAT.
+            The source code is already pushed to GitHub. The live database is not pushed to GitHub; DevOps
+            must provision PostgreSQL and run the schema/seed steps listed here.
+          </p>
+        </div>
+
+        <aside class="status-card glass">
+          <ul class="status-list">
+            <li>
+              <span class="status-label">Repository</span>
+              <span class="status-value">github.com/tahamie/gymportal</span>
+            </li>
+            <li>
+              <span class="status-label">Latest DB Handoff Commit</span>
+              <span class="status-value">9b0e7af</span>
+            </li>
+            <li>
+              <span class="status-label">Target Stage</span>
+              <span class="status-value">Controlled Demo / UAT</span>
+            </li>
+          </ul>
+        </aside>
+      </div>
+
+      <div class="grid">
+        <section class="glass">
+          <div class="section-head">
+            <div>
+              <h2>High-Level Architecture</h2>
+              <p>GymFlow is a tenant-based product with separate Tenant Portal and Super Admin Portal flows.</p>
+            </div>
+            <span class="pill">Tenant Isolated</span>
+          </div>
+
+          <div class="cards">
+            <div class="mini-card">
+              <strong>Frontend</strong>
+              <span>React + Vite static build served from <code>dist/</code>.</span>
+            </div>
+            <div class="mini-card">
+              <strong>Backend</strong>
+              <span>Node.js HTTP API compiled from TypeScript.</span>
+            </div>
+            <div class="mini-card">
+              <strong>Database</strong>
+              <span>PostgreSQL central DB plus isolated tenant DBs.</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="half glass">
+          <div class="section-head">
+            <div>
+              <h2>Repository Pull</h2>
+              <p>Use the main branch from the GitHub repository.</p>
+            </div>
+            <span class="pill">Step 1</span>
+          </div>
+
+          <pre><code>git clone https://github.com/tahamie/gymportal.git
+cd gymportal
+npm install</code></pre>
+        </section>
+
+        <section class="half glass">
+          <div class="section-head">
+            <div>
+              <h2>Build Commands</h2>
+              <p>Run these before deployment to validate the app.</p>
+            </div>
+            <span class="pill">Step 2</span>
+          </div>
+
+          <pre><code>npm run lint
+npm run typecheck
+npm run backend:build
+npm run build
+npm run backend:test</code></pre>
+        </section>
+
+        <section class="glass">
+          <div class="section-head">
+            <div>
+              <h2>Environment Variables</h2>
+              <p>Use real secrets on the server. Do not commit production passwords or tokens.</p>
+            </div>
+            <span class="pill">Required</span>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Variable</th>
+                <th>Purpose</th>
+                <th>Example</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>PORT</code></td>
+                <td>Backend API port.</td>
+                <td><code>4100</code></td>
+              </tr>
+              <tr>
+                <td><code>VITE_GYMFLOW_API_BASE_URL</code></td>
+                <td>Frontend API base URL.</td>
+                <td><code>https://api.your-domain.com</code></td>
+              </tr>
+              <tr>
+                <td><code>VITE_GYMFLOW_API_MODE</code></td>
+                <td>Frontend API mode.</td>
+                <td><code>backend</code></td>
+              </tr>
+              <tr>
+                <td><code>GYMFLOW_REPOSITORY</code></td>
+                <td>Persistence mode.</td>
+                <td><code>postgres</code></td>
+              </tr>
+              <tr>
+                <td><code>GYMFLOW_CENTRAL_DATABASE_URL</code></td>
+                <td>Central Super Admin/platform DB.</td>
+                <td><code>postgres://USER:PASSWORD@HOST:5432/gymflow_central</code></td>
+              </tr>
+              <tr>
+                <td><code>GYMFLOW_POSTGRES_ADMIN_URL</code></td>
+                <td>Admin-capable connection for provisioning workflows.</td>
+                <td><code>postgres://ADMIN:PASSWORD@HOST:5432/postgres</code></td>
+              </tr>
+              <tr>
+                <td><code>GYMFLOW_TENANT_DATABASE_URL_TEMPLATE</code></td>
+                <td>Tenant DB connection template. Must include <code>{database}</code>.</td>
+                <td><code>postgres://USER:PASSWORD@HOST:5432/{database}</code></td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="callout">
+            A safe example file is included in the repo as <code>.env.example</code>. Production values must be
+            stored in the deployment platform or server secret manager.
+          </div>
+        </section>
+
+        <section class="glass">
+          <div class="section-head">
+            <div>
+              <h2>Database Setup</h2>
+              <p>There is no live DB file to upload. DevOps must provision PostgreSQL and apply the schema.</p>
+            </div>
+            <span class="pill">PostgreSQL</span>
+          </div>
+
+          <ol class="steps">
+            <li>Create PostgreSQL server or managed PostgreSQL instance.</li>
+            <li>Create central database, recommended name: <code>gymflow_central</code>.</li>
+            <li>Create one tenant database per tenant, for demo: <code>tenant_fitzone_khi</code>.</li>
+            <li>Apply <code>backend/db/central.sql</code> to the central database.</li>
+            <li>Apply <code>backend/db/tenant.sql</code> to every tenant database.</li>
+            <li>Set all <code>GYMFLOW_*</code> environment variables.</li>
+            <li>For demo/UAT only, run the seed script.</li>
+          </ol>
+
+          <pre><code>npm run backend:seed-postgres</code></pre>
+
+          <div class="callout danger">
+            Production should not use demo passwords. Seed data is for mock run/UAT only.
+          </div>
+        </section>
+
+        <section class="half glass">
+          <div class="section-head">
+            <div>
+              <h2>Local DB Smoke Test</h2>
+              <p>Optional local PostgreSQL setup using Docker.</p>
+            </div>
+            <span class="pill">Optional</span>
+          </div>
+
+          <pre><code>docker compose -f docker-compose.postgres.yml up -d
+cp .env.example .env
+npm install
+npm run backend:seed-postgres
+GYMFLOW_REPOSITORY=postgres npm run backend:start</code></pre>
+        </section>
+
+        <section class="half glass">
+          <div class="section-head">
+            <div>
+              <h2>Backend Start</h2>
+              <p>Compile and start the API server.</p>
+            </div>
+            <span class="pill">API</span>
+          </div>
+
+          <pre><code>npm run backend:build
+npm run backend:start</code></pre>
+
+          <p>Health check:</p>
+          <pre><code>GET /health</code></pre>
+        </section>
+
+        <section class="half glass">
+          <div class="section-head">
+            <div>
+              <h2>Frontend Deploy</h2>
+              <p>Build static frontend and serve the <code>dist/</code> folder.</p>
+            </div>
+            <span class="pill">Web</span>
+          </div>
+
+          <pre><code>VITE_GYMFLOW_API_BASE_URL=https://api.your-domain.com \
+VITE_GYMFLOW_API_MODE=backend \
+npm run build</code></pre>
+
+          <p>Deploy output:</p>
+          <pre><code>dist/</code></pre>
+        </section>
+
+        <section class="half glass">
+          <div class="section-head">
+            <div>
+              <h2>Demo Credentials</h2>
+              <p>Seeded credentials for controlled demo/UAT only.</p>
+            </div>
+            <span class="pill">Demo</span>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Role</th>
+                <th>Email</th>
+                <th>Password</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Super Admin</td>
+                <td><code>ops@gymflow.pk</code></td>
+                <td><code>demo</code></td>
+              </tr>
+              <tr>
+                <td>Tenant Admin</td>
+                <td><code>admin@fitzone.pk</code></td>
+                <td><code>demo</code></td>
+              </tr>
+              <tr>
+                <td>Staff</td>
+                <td><code>staff@fitzone.pk</code></td>
+                <td><code>demo</code></td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section class="glass">
+          <div class="section-head">
+            <div>
+              <h2>Demo Scope</h2>
+              <p>Expected features available in the deployed MVP.</p>
+            </div>
+            <span class="pill">MVP</span>
+          </div>
+
+          <ul class="checklist">
+            <li>Super Admin login</li>
+            <li>Tenant registration/provisioning</li>
+            <li>Tenant status and plan management</li>
+            <li>Subscription billing invoices</li>
+            <li>Tenant Admin login</li>
+            <li>Staff login</li>
+            <li>Member creation and editing</li>
+            <li>Member lifecycle actions</li>
+            <li>Payment recording and receipt preview</li>
+            <li>Renewals queue and actions</li>
+            <li>Notification logs and retry</li>
+            <li>Reports and CSV exports</li>
+            <li>Tenant settings</li>
+            <li>Tenant/platform audit logs</li>
+          </ul>
+        </section>
+
+        <section class="third glass">
+          <div class="section-head">
+            <div>
+              <h2>DB Files</h2>
+              <p>Files DevOps should inspect.</p>
+            </div>
+          </div>
+
+          <ul>
+            <li><code>backend/db/central.sql</code></li>
+            <li><code>backend/db/tenant.sql</code></li>
+            <li><code>backend/db/init-local.sql</code></li>
+            <li><code>backend/db/README.md</code></li>
+            <li><code>backend/src/scripts/seedPostgres.ts</code></li>
+          </ul>
+        </section>
+
+        <section class="third glass">
+          <div class="section-head">
+            <div>
+              <h2>Routes</h2>
+              <p>Suggested deployment layout.</p>
+            </div>
+          </div>
+
+          <ul>
+            <li>Frontend: <code>https://app.your-domain.com</code></li>
+            <li>Backend: <code>https://api.your-domain.com</code></li>
+            <li>Health: <code>https://api.your-domain.com/health</code></li>
+          </ul>
+        </section>
+
+        <section class="third glass">
+          <div class="section-head">
+            <div>
+              <h2>Security Notes</h2>
+              <p>Before public production.</p>
+            </div>
+          </div>
+
+          <ul>
+            <li>Replace demo passwords.</li>
+            <li>Use HTTPS only.</li>
+            <li>Store secrets outside Git.</li>
+            <li>Enable backups and restore testing.</li>
+            <li>Configure CORS for real domains.</li>
+          </ul>
+        </section>
+
+        <section class="glass">
+          <div class="section-head">
+            <div>
+              <h2>Production Hardening Still Required</h2>
+              <p>The current build is suitable for controlled demo/UAT. These items are needed before real go-live.</p>
+            </div>
+            <span class="pill">Before Go-Live</span>
+          </div>
+
+          <ul class="checklist">
+            <li>Password hashing and real password verification</li>
+            <li>JWT/session expiry and refresh tokens</li>
+            <li>MFA-ready Super Admin login flow</li>
+            <li>Background workers for renewals and notifications</li>
+            <li>Tenant stats sync job</li>
+            <li>Provisioning job worker</li>
+            <li>WhatsApp/SMS/email provider credentials</li>
+            <li>Billing/payment provider production integration</li>
+            <li>Centralized logs and monitoring</li>
+            <li>Automated database backups</li>
+            <li>Role-based endpoint hardening</li>
+            <li>Production CORS and secret rotation</li>
+          </ul>
+
+          <div class="callout ok">
+            Recommended next step for DevOps: deploy this first as a password-protected UAT/demo environment,
+            verify complete client flow, then harden for public production.
+          </div>
+        </section>
+      </div>
+
+      <footer>
+        GymFlow DevOps Handoff | Prepared for controlled demo/UAT deployment
+      </footer>
+    </main>
+  </body>
+</html>

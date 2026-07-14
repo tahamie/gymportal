@@ -1,0 +1,36 @@
+{
+  "name": "gymflow",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "backend:build": "tsc -p tsconfig.backend.json",
+    "backend:reset-db": "node backend/dist/scripts/resetDevDb.js",
+    "backend:seed-postgres": "npm run backend:build && node backend/dist/scripts/seedPostgres.js",
+    "backend:start": "node backend/dist/server.js",
+    "backend:test": "node --test backend/dist/tests/*.test.js",
+    "backend:typecheck": "tsc -p tsconfig.backend.json --noEmit",
+    "typecheck": "tsc -b",
+    "lint": "oxlint",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "lucide-react": "^1.24.0",
+    "pg": "^8.22.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "recharts": "^3.9.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.2",
+    "@types/pg": "^8.20.0",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.3",
+    "oxlint": "^1.71.0",
+    "typescript": "~6.0.2",
+    "vite": "^8.1.1"
+  }
+}

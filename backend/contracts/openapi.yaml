@@ -1,0 +1,249 @@
+openapi: 3.1.0
+info:
+  title: GymFlow API Contract
+  version: 0.1.0
+  description: >
+    Initial backend contract for GymFlow. Tenant APIs always operate inside one
+    tenant database. Super Admin APIs operate only on the central platform
+    database and aggregated tenant_stats snapshots.
+servers:
+  - url: https://api.gymflow.pk/v1
+security:
+  - bearerAuth: []
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    TenantId:
+      name: X-Tenant-ID
+      in: header
+      required: true
+      schema:
+        type: string
+      description: Required for all tenant-scoped APIs. Ignored on Super Admin central APIs.
+  schemas:
+    AuthSession:
+      type: object
+      required: [accessToken, user, portal]
+      properties:
+        accessToken:
+          type: string
+        portal:
+          enum: [tenant, super-admin]
+        user:
+          type: object
+          required: [id, name, role]
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            role:
+              enum: [tenant-admin, staff, super-admin]
+            tenantId:
+              type: string
+              nullable: true
+    Member:
+      type: object
+      required: [id, name, phone, branchId, planId, status]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        phone:
+          type: string
+        branchId:
+          type: string
+        planId:
+          type: string
+        status:
+          enum: [active, balance_due, dues_pending, suspended, cancelled]
+        currentBalance:
+          type: number
+        dueDate:
+          type: string
+          format: date
+    Payment:
+      type: object
+      required: [id, memberId, amountPaid, method, paymentType, collectedAt]
+      properties:
+        id:
+          type: string
+        memberId:
+          type: string
+        amountPaid:
+          type: number
+        discount:
+          type: number
+        lateFee:
+          type: number
+        method:
+          enum: [cash, easypaisa, jazzcash, card, bank_transfer]
+        transactionId:
+          type: string
+          nullable: true
+        paymentType:
+          enum: [full, partial]
+        outstandingAfter:
+          type: number
+        collectedAt:
+          type: string
+          format: date-time
+    Tenant:
+      type: object
+      required: [id, name, slug, status, plan]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        status:
+          enum: [trial, active, suspended, cancelled]
+        plan:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+paths:
+  /auth/login:
+    post:
+      summary: Login for tenant users or Super Admin users
+      tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, portal]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                portal:
+                  enum: [tenant, super-admin]
+                tenantSlug:
+                  type: string
+                  nullable: true
+      responses:
+        "200":
+          description: Authenticated session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSession"
+  /tenant/members:
+    get:
+      summary: List tenant members
+      tags: [Tenant Members]
+      parameters:
+        - $ref: "#/components/parameters/TenantId"
+      responses:
+        "200":
+          description: Tenant member list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Member"
+    post:
+      summary: Create tenant member
+      tags: [Tenant Members]
+      parameters:
+        - $ref: "#/components/parameters/TenantId"
+      responses:
+        "201":
+          description: Member created
+  /tenant/payments:
+    get:
+      summary: List tenant payments
+      tags: [Tenant Payments]
+      parameters:
+        - $ref: "#/components/parameters/TenantId"
+      responses:
+        "200":
+          description: Payment list
+    post:
+      summary: Record full or partial payment
+      tags: [Tenant Payments]
+      parameters:
+        - $ref: "#/components/parameters/TenantId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Payment"
+      responses:
+        "201":
+          description: Payment recorded and receipt generated
+  /tenant/renewals:
+    get:
+      summary: Renewal queue and reminder plan
+      tags: [Tenant Renewals]
+      parameters:
+        - $ref: "#/components/parameters/TenantId"
+      responses:
+        "200":
+          description: Renewal workload
+  /tenant/notifications:
+    get:
+      summary: Templates, delivery log, failed queue, and opt-outs
+      tags: [Tenant Notifications]
+      parameters:
+        - $ref: "#/components/parameters/TenantId"
+      responses:
+        "200":
+          description: Notification module state
+  /tenant/reports/summary:
+    get:
+      summary: Tenant report tiles and dashboard metrics
+      tags: [Tenant Reports]
+      parameters:
+        - $ref: "#/components/parameters/TenantId"
+      responses:
+        "200":
+          description: Tenant reporting summary
+  /platform/tenants:
+    get:
+      summary: List central tenants for Super Admin
+      tags: [Platform]
+      responses:
+        "200":
+          description: Central tenant list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Tenant"
+    post:
+      summary: Provision a new tenant shell
+      tags: [Platform]
+      responses:
+        "202":
+          description: Tenant provisioning started
+  /platform/plans:
+    get:
+      summary: Subscription plans
+      tags: [Platform]
+      responses:
+        "200":
+          description: Platform plans
+  /platform/tenant-stats:
+    get:
+      summary: Aggregated tenant stats snapshots
+      tags: [Platform]
+      responses:
+        "200":
+          description: Aggregated stats only, no tenant member rows

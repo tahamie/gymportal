@@ -31,14 +31,17 @@ const ids = {
   templateOverdue: 'f1000000-0000-4000-8000-000000001002',
 }
 
-function requireEnv(name: string) {
-  const value = process.env[name]
-  if (!value) throw new Error(`${name} is required to seed PostgreSQL.`)
+function requireEnv(name: string, legacyName?: string) {
+  const value = process.env[name] ?? (legacyName ? process.env[legacyName] : undefined)
+  if (!value) {
+    const names = legacyName ? `${name} or ${legacyName}` : name
+    throw new Error(`${names} is required to seed PostgreSQL.`)
+  }
   return value
 }
 
 function tenantConnectionString(databaseName: string) {
-  return requireEnv('TENANT_DATABASE_URL_TEMPLATE')
+  return requireEnv('GYMFLOW_TENANT_DATABASE_URL_TEMPLATE', 'TENANT_DATABASE_URL_TEMPLATE')
     .replaceAll('{databaseName}', databaseName)
     .replaceAll('{database}', databaseName)
 }
@@ -299,7 +302,9 @@ async function seedFitZoneTenant(pool: Pool) {
 }
 
 async function main() {
-  const centralPool = new Pool({ connectionString: requireEnv('DATABASE_URL') })
+  const centralPool = new Pool({
+    connectionString: requireEnv('GYMFLOW_CENTRAL_DATABASE_URL', 'DATABASE_URL'),
+  })
   const fitZonePool = new Pool({ connectionString: tenantConnectionString('tenant_fitzone_khi') })
 
   try {

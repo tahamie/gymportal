@@ -66,7 +66,11 @@ What is pushed:
 
 - `backend/db/central.sql`
 - `backend/db/tenant.sql`
+- `backend/db/init-local.sql`
+- `backend/db/README.md`
 - `backend/src/scripts/seedPostgres.ts`
+- `.env.example`
+- `docker-compose.postgres.yml`
 - repository code for file and PostgreSQL modes
 
 What DevOps should provision separately:
@@ -92,6 +96,14 @@ npm run backend:seed-postgres
 ```
 
 The seed script applies central and tenant schema setup and demo data for the current MVP.
+
+For local database smoke testing:
+
+```bash
+docker compose -f docker-compose.postgres.yml up -d
+cp .env.example .env
+npm run backend:seed-postgres
+```
 
 ## Demo Credentials
 

@@ -16,6 +16,7 @@ import {
   type Portal,
   type ProvisionTenantInput,
   type RenewalQueueItem,
+  type TenantPayment,
   type TenantReportSummary,
   type TenantSettings,
   type UpdateMemberInput,
@@ -215,13 +216,13 @@ function mockMembersKey(session?: AuthSession) {
 
 function readMockMembers(session?: AuthSession): Member[] {
   const storedMembers = window.localStorage.getItem(mockMembersKey(session))
-  if (!storedMembers) return mockGymFlowApi.tenant.getMembers()
+  if (!storedMembers) return []
 
   try {
     const parsedMembers = JSON.parse(storedMembers) as Member[]
-    return Array.isArray(parsedMembers) ? parsedMembers : mockGymFlowApi.tenant.getMembers()
+    return Array.isArray(parsedMembers) ? parsedMembers : []
   } catch {
-    return mockGymFlowApi.tenant.getMembers()
+    return []
   }
 }
 
@@ -268,97 +269,16 @@ function mockRenewalsFromMembers(members: Member[]): RenewalQueueItem[] {
     }))
 }
 
-function mockTenantAuditLogs(session?: AuthSession): AuditLog[] {
-  const tenantId = session?.tenantId ?? 'tenant_fitzone_khi'
-  return [
-    {
-      id: 'mock-audit-member-created',
-      scope: 'tenant',
-      tenantId,
-      actorUserId: 'mock-tenant-admin',
-      actorName: session?.name ?? 'Tenant Admin',
-      action: 'member.created',
-      entityType: 'member',
-      entityId: 'GF-2026-00289',
-      metadata: { source: 'demo' },
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: 'mock-audit-payment-created',
-      scope: 'tenant',
-      tenantId,
-      actorUserId: 'mock-tenant-admin',
-      actorName: session?.name ?? 'Tenant Admin',
-      action: 'payment.created',
-      entityType: 'payment',
-      entityId: 'RCP-2026-00143',
-      metadata: { amountPkr: 4500 },
-      createdAt: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
-    },
-    {
-      id: 'mock-audit-reminder-queued',
-      scope: 'tenant',
-      tenantId,
-      actorUserId: 'mock-staff',
-      actorName: 'Front Desk Staff',
-      action: 'notification.reminder_queued',
-      entityType: 'notification',
-      entityId: 'mock-notification-1',
-      metadata: { channel: 'whatsapp' },
-      createdAt: new Date(Date.now() - 1000 * 60 * 90).toISOString(),
-    },
-  ]
+function mockTenantAuditLogs(_session?: AuthSession): AuditLog[] {
+  return []
 }
 
-function mockPlatformAuditLogs(session?: AuthSession): AuditLog[] {
-  return [
-    {
-      id: 'mock-platform-tenant-created',
-      scope: 'platform',
-      tenantId: null,
-      actorUserId: 'mock-super-admin',
-      actorName: session?.name ?? 'GymFlow Operations',
-      action: 'tenant.provisioned',
-      entityType: 'tenant',
-      entityId: 'tenant_newgym_lhr',
-      metadata: { planCode: 'growth' },
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: 'mock-platform-plan-upserted',
-      scope: 'platform',
-      tenantId: null,
-      actorUserId: 'mock-super-admin',
-      actorName: session?.name ?? 'GymFlow Operations',
-      action: 'platform_plan.upserted',
-      entityType: 'platform_plan',
-      entityId: 'growth',
-      metadata: { monthlyPricePkr: 24000 },
-      createdAt: new Date(Date.now() - 1000 * 60 * 60).toISOString(),
-    },
-  ]
+function mockPlatformAuditLogs(_session?: AuthSession): AuditLog[] {
+  return []
 }
 
 function defaultMockBillingInvoices(): PlatformBillingInvoice[] {
-  const now = new Date()
-  const periodStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10)
-  const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10)
-  return mockGymFlowApi.platform.getTenants().slice(0, 2).map((tenant, index) => ({
-    id: `mock-invoice-${tenant.id}`,
-    invoiceNumber: `INV-${now.getFullYear()}-${String(index + 1).padStart(5, '0')}`,
-    tenantId: tenant.id,
-    tenantName: tenant.name,
-    planName: tenant.plan,
-    amountPkr: tenant.plan === 'Professional' ? 42000 : tenant.plan === 'Starter' ? 12000 : 24000,
-    status: index === 0 ? 'issued' : 'paid',
-    periodStart,
-    periodEnd,
-    dueDate: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7).toISOString().slice(0, 10),
-    paidAt: index === 0 ? null : new Date().toISOString(),
-    provider: index === 0 ? 'manual' : 'external_stub',
-    providerReference: index === 0 ? null : `GF-PAY-${Date.now()}`,
-    createdAt: new Date(Date.now() - index * 86400000).toISOString(),
-  }))
+  return []
 }
 
 function readMockBillingInvoices() {
@@ -562,7 +482,7 @@ export const gymFlowApi = {
         }),
       })
     },
-    createPayment: async (session: AuthSession, input: CreatePaymentRequest) => {
+    createPayment: async (session: AuthSession, input: CreatePaymentRequest): Promise<{ payment?: TenantPayment }> => {
       if (session.apiMode !== 'backend' || !session.accessToken || !session.tenantId) {
         const amountDue = Math.max(0, (input.member.balance || mockPlanPrice(input.member.plan)) + input.lateFeePkr - input.discountPkr)
         const outstandingAfter = Math.max(0, amountDue - input.amountPaidPkr)
@@ -579,10 +499,10 @@ export const gymFlowApi = {
               : member,
           ),
         )
-        return { ok: true }
+        return { payment: undefined }
       }
 
-      return requestBackend('/tenant/payments', {
+      const data = await requestBackend<{ payment: TenantPayment }>('/tenant/payments', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${session.accessToken}`,
@@ -597,6 +517,20 @@ export const gymFlowApi = {
           transactionId: input.transactionId,
         }),
       })
+      return { payment: data.payment }
+    },
+    getPayments: async (session: AuthSession): Promise<TenantPayment[]> => {
+      if (session.apiMode !== 'backend' || !session.accessToken || !session.tenantId) {
+        return []
+      }
+
+      const data = await requestBackend<{ payments: TenantPayment[] }>('/tenant/payments', {
+        headers: {
+          Authorization: `Bearer ${session.accessToken}`,
+          'X-Tenant-ID': session.tenantId,
+        },
+      })
+      return data.payments
     },
     getRenewals: async (session: AuthSession): Promise<RenewalQueueItem[]> => {
       if (session.apiMode !== 'backend' || !session.accessToken || !session.tenantId) {
@@ -643,16 +577,7 @@ export const gymFlowApi = {
     },
     getNotifications: async (session: AuthSession): Promise<NotificationLog[]> => {
       if (session.apiMode !== 'backend' || !session.accessToken || !session.tenantId) {
-        return mockGymFlowApi.tenant.getNotifications().map((notification, index) => ({
-          id: `mock-${index}`,
-          memberId: notification.member,
-          memberName: notification.member,
-          triggerCode: notification.trigger,
-          channel: notification.channel.toLowerCase() as NotificationLog['channel'],
-          status: notification.status.toLowerCase() as NotificationLog['status'],
-          failureReason: notification.status === 'Failed' ? 'Provider timeout' : null,
-          createdAt: notification.time,
-        }))
+        return []
       }
 
       const data = await requestBackend<{ notifications: NotificationLog[] }>('/tenant/notifications', {
@@ -823,15 +748,12 @@ export const gymFlowApi = {
     getReportSummary: async (session: AuthSession): Promise<TenantReportSummary> => {
       if (session.apiMode !== 'backend' || !session.accessToken || !session.tenantId) {
         return {
-          collectionsPkr: 714000,
-          outstandingDuesPkr: 318700,
-          renewalDueCount: 142,
-          activeMembers: 1284,
-          suspendedMembers: 23,
-          paymentMethodBreakdown: [
-            { method: 'cash', amountPkr: 314000 },
-            { method: 'easypaisa', amountPkr: 194000 },
-          ],
+          collectionsPkr: 0,
+          outstandingDuesPkr: 0,
+          renewalDueCount: 0,
+          activeMembers: 0,
+          suspendedMembers: 0,
+          paymentMethodBreakdown: [],
         }
       }
 
@@ -846,7 +768,7 @@ export const gymFlowApi = {
   platform: {
     getTenants: async (session: AuthSession) => {
       if (session.apiMode !== 'backend' || !session.accessToken) {
-        return mockGymFlowApi.platform.getTenants()
+        return []
       }
 
       const data = await requestBackend<{ tenants: BackendTenant[] }>('/platform/tenants', {
@@ -966,14 +888,7 @@ export const gymFlowApi = {
     },
     getTenantStats: async (session: AuthSession): Promise<PlatformTenantStats[]> => {
       if (session.apiMode !== 'backend' || !session.accessToken) {
-        return mockGymFlowApi.platform.getTenants().map((tenant) => ({
-          tenantId: tenant.id,
-          activeMembers: tenant.members,
-          suspendedMembers: tenant.status === 'Suspended' ? 1 : 0,
-          monthlyRevenuePkr: tenant.revenue,
-          outstandingDuesPkr: Math.round(tenant.revenue * 0.18),
-          renewalDueCount: Math.round(tenant.members * 0.16),
-        }))
+        return []
       }
 
       const data = await requestBackend<{ stats: PlatformTenantStats[] }>('/platform/tenant-stats', {

@@ -234,6 +234,7 @@ export function createPostgresRepositories(): RepositoryProvider {
           updatedMember.id,
           updatedMember.currentBalancePkr,
           updatedMember.status,
+          updatedMember.dueDate,
         ])
         return updatedMember
       },
@@ -269,6 +270,7 @@ export function createPostgresRepositories(): RepositoryProvider {
             updatedMember.id,
             updatedMember.currentBalancePkr,
             updatedMember.status,
+            updatedMember.dueDate,
           ])
           await client.query(tenantSql.createReceipt, [
             randomUUID(),
@@ -513,6 +515,7 @@ export function createPostgresRepositories(): RepositoryProvider {
       updatedMember.id,
       updatedMember.currentBalancePkr,
       updatedMember.status,
+      updatedMember.dueDate,
     ])
     return updatedMember
   }

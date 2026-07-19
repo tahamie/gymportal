@@ -494,6 +494,7 @@ export const tenantSql = {
     update members
     set current_balance_pkr = $2,
         status = $3,
+        due_date = $4,
         updated_at = now()
     where id = $1
   `,

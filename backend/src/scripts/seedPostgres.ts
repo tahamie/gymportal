@@ -46,10 +46,6 @@ function tenantConnectionString(databaseName: string) {
     .replaceAll('{database}', databaseName)
 }
 
-function shouldSeedDemoData() {
-  return process.env.GYMFLOW_SEED_DEMO_DATA === 'true'
-}
-
 async function runSchema(pool: Pool, fileName: string) {
   const schema = readFileSync(join(process.cwd(), 'backend/db', fileName), 'utf8')
   await pool.query(schema)
@@ -119,32 +115,6 @@ async function seedCentral(pool: Pool) {
     [ids.fitzoneTenant, ids.growthPlan],
   )
 
-  if (!shouldSeedDemoData()) return
-
-  await pool.query(
-    `
-      insert into tenants (
-        id,
-        name,
-        slug,
-        status,
-        plan_id,
-        database_name,
-        primary_domain
-      )
-      values
-        ($1, 'Iron Temple Lahore', 'irontemple-lhr', 'trial', $2, 'tenant_irontemple_lhr', 'irontemple-lhr.gymflow.pk')
-      on conflict (slug) do update
-      set name = excluded.name,
-          status = excluded.status,
-          plan_id = excluded.plan_id,
-          database_name = excluded.database_name,
-          primary_domain = excluded.primary_domain,
-          updated_at = now()
-    `,
-    [ids.irontempleTenant, ids.professionalPlan],
-  )
-
   await pool.query(
     `
       insert into tenant_stats (
@@ -158,8 +128,7 @@ async function seedCentral(pool: Pool) {
         renewal_due_count
       )
       values
-        ('f1000000-0000-4000-8000-000000001101', $1, '2026-07-10', 2, 0, 6200, 5200, 2),
-        ('f1000000-0000-4000-8000-000000001102', $2, '2026-07-10', 0, 0, 0, 0, 0)
+        ('f1000000-0000-4000-8000-000000001101', $1, current_date, 0, 0, 0, 0, 0)
       on conflict (tenant_id, snapshot_date) do update
       set active_members = excluded.active_members,
           suspended_members = excluded.suspended_members,
@@ -167,7 +136,7 @@ async function seedCentral(pool: Pool) {
           outstanding_dues_pkr = excluded.outstanding_dues_pkr,
           renewal_due_count = excluded.renewal_due_count
     `,
-    [ids.fitzoneTenant, ids.irontempleTenant],
+    [ids.fitzoneTenant],
   )
 }
 
@@ -235,100 +204,6 @@ async function seedFitZoneTenant(pool: Pool) {
           updated_at = now()
     `,
     [ids.templateDueSoon, ids.templateOverdue],
-  )
-
-  if (!shouldSeedDemoData()) return
-
-  await pool.query(
-    `
-      insert into members (
-        id,
-        member_code,
-        name,
-        phone,
-        branch_id,
-        plan_id,
-        status,
-        current_balance_pkr,
-        due_date,
-        joined_at
-      )
-      values
-        ($1, 'GF-2026-00284', 'Ali Raza', '+92 300 129 8821', $2, $3, 'active', 0, '2026-07-22', '2026-01-12'),
-        ($4, 'GF-2026-00285', 'Hira Khan', '+92 321 663 4481', $5, $6, 'balance_due', 1700, '2026-07-13', '2026-02-03'),
-        ($7, 'GF-2026-00286', 'Usman Malik', '+92 333 554 1187', $8, $9, 'dues_pending', 3500, '2026-07-10', '2026-03-08')
-      on conflict (member_code) do update
-      set name = excluded.name,
-          phone = excluded.phone,
-          branch_id = excluded.branch_id,
-          plan_id = excluded.plan_id,
-          status = excluded.status,
-          current_balance_pkr = excluded.current_balance_pkr,
-          due_date = excluded.due_date,
-          updated_at = now()
-    `,
-    [
-      ids.aliRaza,
-      ids.dhaBranch,
-      ids.monthlyProPlan,
-      ids.hiraKhan,
-      ids.mainBranch,
-      ids.monthlyBasicPlan,
-      ids.usmanMalik,
-      ids.gulbergBranch,
-      ids.quarterlyElitePlan,
-    ],
-  )
-
-  await pool.query(
-    `
-      insert into payments (
-        id,
-        member_id,
-        collected_by,
-        amount_paid_pkr,
-        discount_pkr,
-        late_fee_pkr,
-        method,
-        transaction_id,
-        payment_type,
-        outstanding_after_pkr,
-        extends_expiry,
-        collected_at
-      )
-      values
-        ($1, $2, $3, 4500, 0, 0, 'easypaisa', 'EP-SEED-001', 'full', 0, true, '2026-07-10T09:15:00+05:00'),
-        ($4, $5, $3, 1800, 0, 0, 'cash', null, 'partial', 1700, false, '2026-07-08T16:20:00+05:00')
-      on conflict (id) do nothing
-    `,
-    [ids.aliPayment, ids.aliRaza, ids.fitzoneAdmin, ids.hiraPayment, ids.hiraKhan],
-  )
-
-  await pool.query(
-    `
-      insert into receipts (id, receipt_no, payment_id, member_id, rendered_payload)
-      values
-        ($1, 'RCP-2026-00144', $2, $3, '{"seeded":true}'::jsonb),
-        ($4, 'RCP-2026-00145', $5, $6, '{"seeded":true}'::jsonb)
-      on conflict (receipt_no) do nothing
-    `,
-    [ids.aliReceipt, ids.aliPayment, ids.aliRaza, ids.hiraReceipt, ids.hiraPayment, ids.hiraKhan],
-  )
-
-  await pool.query(
-    `
-      insert into renewal_events (id, member_id, trigger_code, due_date, status)
-      values
-        ($1, $2, 'due_3_days', '2026-07-22', 'scheduled'),
-        ($3, $4, 'due_today', '2026-07-13', 'scheduled'),
-        ($5, $6, 'overdue', '2026-07-10', 'overdue')
-      on conflict (id) do update
-      set trigger_code = excluded.trigger_code,
-          due_date = excluded.due_date,
-          status = excluded.status,
-          updated_at = now()
-    `,
-    [ids.renewalAli, ids.aliRaza, ids.renewalHira, ids.hiraKhan, ids.renewalUsman, ids.usmanMalik],
   )
 }
 

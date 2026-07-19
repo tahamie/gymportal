@@ -78,6 +78,15 @@ function getPlanPrice(planName: string) {
   return 3500
 }
 
+function nextDueDate(currentDueDate: string, planName: string) {
+  const baseDate = new Date(`${currentDueDate}T00:00:00`)
+  const dueDate = Number.isNaN(baseDate.getTime()) ? new Date() : baseDate
+  if (planName.includes('Annual')) dueDate.setFullYear(dueDate.getFullYear() + 1)
+  else if (planName.includes('Quarterly')) dueDate.setMonth(dueDate.getMonth() + 3)
+  else dueDate.setMonth(dueDate.getMonth() + 1)
+  return dueDate.toISOString().slice(0, 10)
+}
+
 function auditActor(user: { id: string; name: string }) {
   return {
     actorUserId: user.id,
@@ -267,6 +276,7 @@ async function createPayment(req: IncomingMessage, res: ServerResponse) {
   const updatedMember = {
     ...member,
     currentBalancePkr: outstandingAfterPkr,
+    dueDate: outstandingAfterPkr === 0 ? nextDueDate(member.dueDate, member.planName) : member.dueDate,
     lastPaymentDate: now.slice(0, 10),
     status: outstandingAfterPkr > 0 ? 'balance_due' : 'active',
   } as const

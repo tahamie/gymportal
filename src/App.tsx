@@ -17,6 +17,7 @@ import {
   type Portal,
   type ProvisionTenantInput,
   type RenewalQueueItem,
+  type TenantPayment,
   type TenantReportSummary,
   type TenantSettings,
   type UpdateMemberInput,
@@ -126,15 +127,9 @@ const roleAccess: Record<LoginRole, RoleAccess> = {
   },
 }
 
-const members = mockGymFlowApi.tenant.getMembers()
-const revenueData = mockGymFlowApi.tenant.getRevenueByChannel()
-const paymentMix = mockGymFlowApi.tenant.getPaymentMix()
-const reminderPlan = mockGymFlowApi.tenant.getReminderPlan()
+const members: Member[] = []
 const notificationTemplates = mockGymFlowApi.tenant.getNotificationTemplates()
-const optOutMembers = mockGymFlowApi.tenant.getOptOutMembers()
-const activity = mockGymFlowApi.tenant.getActivity()
-const tenants = mockGymFlowApi.platform.getTenants()
-const provisioningSteps = mockGymFlowApi.platform.getProvisioningSteps()
+const tenants = [] as ReturnType<typeof mockGymFlowApi.platform.getTenants>
 const loginOptions = mockGymFlowApi.auth.listLoginOptions()
 type TenantSummary = (typeof tenants)[number]
 
@@ -550,6 +545,7 @@ function App() {
         {!isSuperAdmin && activePage === 'dashboard' && (
           <Dashboard
             members={membersData}
+            session={session}
             onAddMember={() => setIsAddMemberOpen(true)}
             onOpenMember={setSelectedMember}
           />
@@ -797,57 +793,91 @@ function LoginView({
 
 function Dashboard({
   members,
+  session,
   onAddMember,
   onOpenMember,
 }: {
   members: Member[]
+  session: AuthSession
   onAddMember: () => void
   onOpenMember: (member: Member) => void
 }) {
-  function exportRevenue() {
-    downloadCsv('gymflow-revenue-by-channel.csv', revenueData.map((row) => ({
-      day: row.day,
-      cashPkr: row.cash,
-      digitalPkr: row.digital,
-      totalPkr: row.cash + row.digital,
+  const [summary, setSummary] = useState<TenantReportSummary | null>(null)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let isMounted = true
+    gymFlowApi.tenant.getReportSummary(session)
+      .then((reportSummary) => {
+        if (isMounted) setSummary(reportSummary)
+      })
+      .catch((loadError) => {
+        if (isMounted) setError(loadError instanceof Error ? loadError.message : 'Unable to load dashboard metrics.')
+      })
+    return () => {
+      isMounted = false
+    }
+  }, [session, members])
+
+  const paymentMix = summary?.paymentMethodBreakdown ?? []
+  const paymentTotal = paymentMix.reduce((sum, item) => sum + item.amountPkr, 0)
+  const paymentBars = paymentMix.map((item, index) => ({
+    label: item.method.replace('_', ' '),
+    amountPkr: item.amountPkr,
+    color: ['#2563eb', '#16a34a', '#d97706', '#7c3aed'][index % 4],
+  }))
+
+  function exportCollections() {
+    downloadCsv('gymflow-collections-by-method.csv', paymentMix.map((row) => ({
+      method: row.method,
+      amountPkr: row.amountPkr,
     })))
   }
 
   function exportPaymentMix() {
     downloadCsv('gymflow-payment-mix.csv', paymentMix.map((row) => ({
-      method: row.name,
-      percentage: row.value,
+      method: row.method,
+      amountPkr: row.amountPkr,
+      percentage: paymentTotal ? Math.round((row.amountPkr / paymentTotal) * 100) : 0,
     })))
   }
 
   return (
     <>
       <section className="metric-grid" aria-label="Key metrics">
-        <Metric icon="badge" label="Collections today" value="PKR 124,500" trend="+18% vs yesterday" />
-        <Metric icon="users" label="Active members" value="1,284" trend="42 joined this month" />
-        <Metric icon="wallet" label="Outstanding dues" value="PKR 318,700" trend="61 members need follow-up" />
-        <Metric icon="gauge" label="Suspension risk" value="17" trend="Zero payment after due date" />
+        <Metric icon="badge" label="Collections" value={formatPKR(summary?.collectionsPkr ?? 0)} trend="Recorded payments in tenant DB" />
+        <Metric icon="users" label="Active members" value={String(summary?.activeMembers ?? members.filter((member) => member.status === 'Active').length)} trend="Live member directory" />
+        <Metric icon="wallet" label="Outstanding dues" value={formatPKR(summary?.outstandingDuesPkr ?? 0)} trend="Member balances due" />
+        <Metric icon="gauge" label="Suspended members" value={String(summary?.suspendedMembers ?? 0)} trend="Tenant lifecycle status" />
       </section>
+
+      {error && (
+        <div className="error-banner">
+          <AppIcon name="x" size={17} />
+          <span>{error}</span>
+        </div>
+      )}
 
       <section className="dashboard-grid">
         <div className="panel large">
-          <PanelHeader title="Revenue by channel" action="Export" icon="download" onAction={exportRevenue} />
-          <RevenueBars />
+          <PanelHeader title="Collections by method" action="Export" icon="download" onAction={exportCollections} />
+          <RevenueBars items={paymentBars} />
         </div>
 
         <div className="panel">
           <PanelHeader title="Payment mix" action="Export" icon="download" onAction={exportPaymentMix} />
           <div className="mix-layout">
             <div className="donut" aria-label="Payment mix">
-              <span>100%</span>
+              <span>{paymentTotal ? '100%' : '0%'}</span>
             </div>
             <div className="legend-list">
               {paymentMix.map((item) => (
-                <span key={item.name}>
-                  <i style={{ background: item.color }} />
-                  {item.name} · {item.value}%
+                <span key={item.method}>
+                  <i style={{ background: paymentBars.find((bar) => bar.label === item.method.replace('_', ' '))?.color }} />
+                  {item.method.replace('_', ' ')} · {paymentTotal ? Math.round((item.amountPkr / paymentTotal) * 100) : 0}%
                 </span>
               ))}
+              {paymentMix.length === 0 && <span>No payments recorded yet.</span>}
             </div>
           </div>
         </div>
@@ -855,12 +885,10 @@ function Dashboard({
         <div className="panel">
           <PanelHeader title="Operations feed" action="Audit" icon="list" />
           <div className="activity-list">
-            {activity.map((item) => (
-              <div className="activity-item" key={item}>
-                <AppIcon name="check" size={17} />
-                <span>{item}</span>
-              </div>
-            ))}
+            <div className="activity-item">
+              <AppIcon name="spark" size={17} />
+              <span>{members.length === 0 ? 'No member activity yet. Create the first member to begin the demo flow.' : `${members.length} member records loaded from tenant database.`}</span>
+            </div>
           </div>
         </div>
       </section>
@@ -875,21 +903,28 @@ function Dashboard({
   )
 }
 
-function RevenueBars() {
-  const maxTotal = Math.max(...revenueData.map((item) => item.cash + item.digital))
+function RevenueBars({ items }: { items: Array<{ label: string; amountPkr: number; color: string }> }) {
+  if (items.length === 0) {
+    return (
+      <div className="rule-box">
+        <AppIcon name="spark" size={18} />
+        <span>No collection data yet.</span>
+      </div>
+    )
+  }
+
+  const maxTotal = Math.max(...items.map((item) => item.amountPkr), 1)
 
   return (
     <div className="revenue-bars" aria-label="Revenue by channel">
-      {revenueData.map((item) => {
-        const cashHeight = Math.max(12, (item.cash / maxTotal) * 180)
-        const digitalHeight = Math.max(12, (item.digital / maxTotal) * 180)
+      {items.map((item) => {
+        const barHeight = Math.max(12, (item.amountPkr / maxTotal) * 180)
         return (
-          <div className="revenue-day" key={item.day}>
+          <div className="revenue-day" key={item.label}>
             <div className="bar-stack">
-              <span className="bar digital" style={{ height: digitalHeight }} />
-              <span className="bar cash" style={{ height: cashHeight }} />
+              <span className="bar cash" style={{ height: barHeight, background: item.color }} />
             </div>
-            <small>{item.day}</small>
+            <small>{item.label}</small>
           </div>
         )
       })}
@@ -955,6 +990,11 @@ function MembersTable({
                 </td>
               </tr>
             ))}
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={7}>No members yet. Add the first member to begin.</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -1236,24 +1276,16 @@ function MemberDrawer({
 }
 
 function ProfilePayments({ member }: { member: Member }) {
-  const rows = [
-    ['RCP-2026-00142', member.lastPayment, member.balance ? 'Partial' : 'Full', member.balance ? 1800 : getPlanPrice(member.plan)],
-    ['RCP-2026-00118', '10 Jun 2026', 'Full', getPlanPrice(member.plan)],
-    ['RCP-2026-00094', '10 May 2026', 'Full', getPlanPrice(member.plan)],
-  ]
-
   return (
     <div className="profile-list">
-      {rows.map(([receipt, date, type, amount]) => (
-        <div className="profile-list-row" key={receipt}>
-          <AppIcon name="receipt" size={18} />
-          <div>
-            <strong>{receipt}</strong>
-            <span>{date} · {type}</span>
-          </div>
-          <b>{formatPKR(Number(amount))}</b>
+      <div className="profile-list-row">
+        <AppIcon name="receipt" size={18} />
+        <div>
+          <strong>{member.lastPayment ? 'Latest payment recorded' : 'No payments recorded yet'}</strong>
+          <span>{member.lastPayment || 'Payment history will appear after fee collection.'}</span>
         </div>
-      ))}
+        <b>{member.balance ? formatPKR(member.balance) : 'Clear'}</b>
+      </div>
     </div>
   )
 }
@@ -1261,20 +1293,14 @@ function ProfilePayments({ member }: { member: Member }) {
 function ProfileNotifications({ member }: { member: Member }) {
   return (
     <div className="profile-list">
-      {[
-        ['Payment confirmation', 'WhatsApp + SMS delivered', member.lastPayment],
-        ['Renewal reminder', 'Scheduled for 3 days before due date', member.dueDate],
-        ['Opt-in status', 'WhatsApp active, SMS active', 'Current'],
-      ].map(([title, detail, time]) => (
-        <div className="profile-list-row" key={title}>
-          <AppIcon name="message" size={18} />
-          <div>
-            <strong>{title}</strong>
-            <span>{detail}</span>
-          </div>
-          <b>{time}</b>
+      <div className="profile-list-row">
+        <AppIcon name="message" size={18} />
+        <div>
+          <strong>No member notifications yet</strong>
+          <span>Queued reminders and payment confirmations will appear in the Notifications module.</span>
         </div>
-      ))}
+        <b>{member.status}</b>
+      </div>
     </div>
   )
 }
@@ -1283,10 +1309,10 @@ function ProfileTimeline({ member }: { member: Member }) {
   return (
     <div className="timeline expanded">
       <h3>Timeline</h3>
-      <span>Payment received · {member.lastPayment}</span>
-      <span>Reminder scheduled · {member.dueDate}</span>
-      <span>Status reviewed by scheduler · 9:00 AM PKT</span>
-      <span>Membership created · Main reception</span>
+      <span>Member status · {member.status}</span>
+      <span>Current due date · {member.dueDate || 'Not set'}</span>
+      <span>{member.lastPayment ? `Latest payment · ${member.lastPayment}` : 'No payments recorded yet'}</span>
+      <span>Audit entries appear after updates, payments, and reminders.</span>
     </div>
   )
 }
@@ -1357,7 +1383,7 @@ function AddMemberModal({
           <div className="form-grid">
             <label>
               Full name
-              <input value={form.name} onChange={(event) => updateField('name', event.target.value)} placeholder="e.g. Ayesha Noor" />
+              <input value={form.name} onChange={(event) => updateField('name', event.target.value)} placeholder="e.g. Client Member Name" />
             </label>
             <label>
               Phone
@@ -1699,12 +1725,13 @@ function PaymentsView({
   const [memberSearch, setMemberSearch] = useState('')
   const [selectedMemberId, setSelectedMemberId] = useState(initialSelectedMemberId || members[0]?.id || '')
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('easypaisa')
-  const [amountPaid, setAmountPaid] = useState('1700')
+  const [amountPaid, setAmountPaid] = useState('')
   const [discount, setDiscount] = useState('0')
-  const [transactionId, setTransactionId] = useState('EP-883921')
+  const [transactionId, setTransactionId] = useState('')
   const [isConfirmed, setIsConfirmed] = useState(false)
   const [paymentError, setPaymentError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [payments, setPayments] = useState<TenantPayment[]>([])
 
   const paymentCandidates = useMemo(() => {
     const needle = memberSearch.toLowerCase().trim()
@@ -1718,6 +1745,7 @@ function PaymentsView({
   }, [memberSearch, members])
 
   const selectedMember = members.find((member) => member.id === selectedMemberId) ?? members[0]
+  const hasMembers = members.length > 0
   const selectedMemberSafe = selectedMember ?? {
     id: '',
     name: 'No member selected',
@@ -1731,7 +1759,7 @@ function PaymentsView({
   }
   const planPrice = getPlanPrice(selectedMemberSafe.plan)
   const lateFee = selectedMemberSafe.status === 'Dues Pending' || selectedMemberSafe.status === 'Suspended' ? 200 : 0
-  const currentOutstanding = selectedMemberSafe.balance || planPrice
+  const currentOutstanding = selectedMember ? selectedMemberSafe.balance || planPrice : 0
   const paid = Number(amountPaid) || 0
   const discountAmount = Number(discount) || 0
   const amountDue = Math.max(0, currentOutstanding + lateFee - discountAmount)
@@ -1739,19 +1767,35 @@ function PaymentsView({
   const paymentType = outstandingAfter > 0 ? 'Partial' : 'Full'
   const willExtend = outstandingAfter === 0
   const requiresTransactionId = paymentMethod !== 'cash'
+  const latestPayment = payments[0]
+
+  useEffect(() => {
+    let isMounted = true
+    gymFlowApi.tenant.getPayments(session)
+      .then((paymentRows) => {
+        if (isMounted) setPayments(paymentRows)
+      })
+      .catch((loadError) => {
+        if (isMounted) setPaymentError(loadError instanceof Error ? loadError.message : 'Unable to load payment history.')
+      })
+    return () => {
+      isMounted = false
+    }
+  }, [session])
 
   useEffect(() => {
     const nextSelectedId = initialSelectedMemberId || selectedMemberId || members[0]?.id || ''
     const nextMember = members.find((member) => member.id === nextSelectedId)
-    if (!nextMember || nextMember.id === selectedMemberId) return
+    if (!nextMember) return
+    if (nextMember.id === selectedMemberId && amountPaid) return
 
     setSelectedMemberId(nextMember.id)
     setAmountPaid(String(nextMember.balance || getPlanPrice(nextMember.plan)))
     setDiscount('0')
-    setTransactionId(nextMember.id === 'GF-2026-00285' ? 'EP-883921' : '')
+    setTransactionId('')
     setPaymentError('')
     setIsConfirmed(false)
-  }, [initialSelectedMemberId, members, selectedMemberId])
+  }, [amountPaid, initialSelectedMemberId, members, selectedMemberId])
 
   function selectMember(memberId: string) {
     const nextMember = members.find((member) => member.id === memberId) ?? members[0]
@@ -1759,16 +1803,24 @@ function PaymentsView({
     setSelectedMemberId(memberId)
     setAmountPaid(String(nextMember.balance || getPlanPrice(nextMember.plan)))
     setDiscount('0')
-    setTransactionId(memberId === 'GF-2026-00285' ? 'EP-883921' : '')
+    setTransactionId('')
     setPaymentError('')
     setIsConfirmed(false)
   }
 
   async function confirmPayment() {
+    if (!selectedMember || paid <= 0) {
+      setPaymentError('Select a member and enter a valid payment amount.')
+      return
+    }
+    if (requiresTransactionId && !transactionId.trim()) {
+      setPaymentError('Transaction ID is required for digital payments.')
+      return
+    }
     setIsSubmitting(true)
     setPaymentError('')
     try {
-      await gymFlowApi.tenant.createPayment(session, {
+      const result = await gymFlowApi.tenant.createPayment(session, {
         member: selectedMemberSafe,
         amountPaidPkr: paid,
         discountPkr: discountAmount,
@@ -1777,7 +1829,11 @@ function PaymentsView({
         transactionId: transactionId || undefined,
       })
       onMembersChange(await gymFlowApi.tenant.getMembers(session))
+      setPayments(await gymFlowApi.tenant.getPayments(session))
       setIsConfirmed(true)
+      if (result.payment) {
+        setTransactionId(result.payment.transactionId ?? '')
+      }
     } catch (error) {
       setPaymentError(error instanceof Error ? error.message : 'Unable to record payment.')
     } finally {
@@ -1822,6 +1878,12 @@ function PaymentsView({
                 <StatusBadge status={member.status} />
               </button>
             ))}
+            {paymentCandidates.length === 0 && (
+              <div className="rule-box">
+                <AppIcon name="spark" size={18} />
+                <span>{members.length === 0 ? 'No members yet. Add a member before collecting payment.' : 'No members match this search.'}</span>
+              </div>
+            )}
           </div>
 
           <div className="person-summary">
@@ -1900,7 +1962,7 @@ function PaymentsView({
 
           {paymentError && <div className="login-error">{paymentError}</div>}
 
-          <button className="primary-button full" type="button" onClick={confirmPayment} disabled={isSubmitting}>
+          <button className="primary-button full" type="button" onClick={confirmPayment} disabled={isSubmitting || !hasMembers}>
             <AppIcon name="credit" size={18} />
             {isSubmitting ? 'Recording payment' : 'Confirm and generate receipt'}
           </button>
@@ -1911,8 +1973,8 @@ function PaymentsView({
         <div className="receipt-preview">
           <div className="receipt-head">
             <div>
-              <span>FitZone Karachi</span>
-              <strong>RCP-2026-00143</strong>
+              <span>{session.workspace}</span>
+              <strong>{latestPayment?.receiptNo ?? 'Draft receipt'}</strong>
             </div>
             <AppIcon name="receipt" size={28} />
           </div>
@@ -1938,16 +2000,29 @@ function PaymentsView({
         </div>
 
         <div className="receipt-list compact-receipts">
-          {['RCP-2026-00142', 'RCP-2026-00141', 'RCP-2026-00140'].map((receipt, index) => (
-            <div className="receipt-row" key={receipt}>
+          {payments.slice(0, 3).map((payment) => {
+            const member = members.find((memberRow) => memberRow.sourceId === payment.memberId || memberRow.id === payment.memberId)
+            return (
+              <div className="receipt-row" key={payment.id}>
+                <AppIcon name="receipt" size={18} />
+                <div>
+                  <strong>{payment.receiptNo}</strong>
+                  <span>{member?.name ?? 'Member'} · {formatDateLabel(payment.collectedAt)}</span>
+                </div>
+                <b>{formatPKR(payment.amountPaidPkr)}</b>
+              </div>
+            )
+          })}
+          {payments.length === 0 && (
+            <div className="receipt-row">
               <AppIcon name="receipt" size={18} />
               <div>
-                <strong>{receipt}</strong>
-                <span>{['Ali Raza', 'Hira Khan', 'Bilal Shah'][index]}</span>
+                <strong>No receipts yet</strong>
+                <span>Confirmed payments will appear here.</span>
               </div>
-              <b>{formatPKR([3500, 1700, 12000][index])}</b>
+              <b>{formatPKR(0)}</b>
             </div>
-          ))}
+          )}
         </div>
       </div>
     </section>
@@ -2048,6 +2123,12 @@ function RenewalsView({
     { window: '14d', members: Math.max(dueWithin7, Math.ceil(queue.length * 0.65)) },
     { window: '30d', members: queue.length },
   ]
+  const automationPlan = [
+    { trigger: 'expiry_7d', count: queue.filter((item) => item.renewalStatus !== 'paid').length, channel: 'WhatsApp + SMS', time: '8:00 AM' },
+    { trigger: 'expiry_3d', count: queue.filter((item) => item.renewalStatus === 'reminder_queued').length, channel: 'WhatsApp + SMS', time: '8:00 AM' },
+    { trigger: 'due_today', count: overdueCount, channel: 'WhatsApp + SMS', time: '8:00 AM' },
+    { trigger: 'overdue_1d', count: overdueCount, channel: 'WhatsApp + SMS', time: '8:00 AM' },
+  ]
 
   return (
     <>
@@ -2077,7 +2158,7 @@ function RenewalsView({
         <div className="panel">
           <PanelHeader title="Automation plan" action="Templates" icon="bell" />
           <div className="reminder-list">
-            {reminderPlan.map((item) => (
+            {automationPlan.map((item) => (
               <div className="reminder-row" key={item.trigger}>
                 <div>
                   <strong>{item.trigger}</strong>
@@ -2308,16 +2389,7 @@ function NotificationsView({ session }: { session: AuthSession }) {
         <div className="panel">
           <PanelHeader title="Opt-outs and fallback" action="Review" icon="shield" />
           <div className="profile-list">
-            {optOutMembers.map((item) => (
-              <div className="profile-list-row" key={item.member}>
-                <AppIcon name="shield" size={18} />
-                <div>
-                  <strong>{item.member}</strong>
-                  <span>{item.channel} opt-out · {item.fallback}</span>
-                </div>
-                <b>{item.updated}</b>
-              </div>
-            ))}
+            <div className="empty-state compact">No opt-outs recorded yet.</div>
           </div>
           <div className="rule-box notification-note">
             <AppIcon name="spark" size={18} />
@@ -2423,13 +2495,16 @@ function SuperAdminTenants({
   onProvisionTenant: () => void
   onManageTenant: (tenant: TenantSummary) => void
 }) {
+  const activeTenants = tenants.filter((tenant) => tenant.status === 'Active').length
+  const trialTenants = tenants.filter((tenant) => tenant.status === 'Trial').length
+  const suspendedTenants = tenants.filter((tenant) => tenant.status === 'Suspended' || tenant.status === 'Cancelled').length
   return (
     <>
       <section className="metric-grid" aria-label="Tenant controls">
-        <Metric icon="building" label="Active tenants" value="22" trend="1 suspended, 3 in trial" />
-        <Metric icon="spark" label="Provisioning queue" value="4" trend="2 waiting for domain checks" />
-        <Metric icon="wallet" label="Billing due" value="PKR 684K" trend="Invoices across 9 gyms" />
-        <Metric icon="shield" label="Isolation checks" value="100%" trend="No tenant DB cross-access" />
+        <Metric icon="building" label="Active tenants" value={String(activeTenants)} trend={`${trialTenants} trial, ${suspendedTenants} suspended/cancelled`} />
+        <Metric icon="spark" label="Provisioning queue" value="0" trend="No pending tenant jobs" />
+        <Metric icon="wallet" label="Billing due" value="PKR 0" trend="No invoices generated yet" />
+        <Metric icon="shield" label="Isolation checks" value="Ready" trend="Central views exclude tenant member records" />
       </section>
 
       <section className="notification-grid lower">
@@ -2679,15 +2754,21 @@ function SuperAdminPlans({
 }
 
 function SuperAdminProvisioning({ onProvisionTenant }: { onProvisionTenant: () => void }) {
+  const provisioningSteps = [
+    { title: 'Create central tenant', detail: 'Stores tenant profile, slug, plan, and provisioning status.' },
+    { title: 'Prepare tenant database', detail: 'Creates an isolated tenant data store before first login.' },
+    { title: 'Configure access', detail: 'Adds initial tenant admin credentials and branch defaults.' },
+    { title: 'Verify routing', detail: 'Checks login URL, API health, and tenant isolation guards.' },
+  ]
   return (
     <section className="two-column">
       <div className="panel">
-        <PanelHeader title="Onboard gym" action="Create" icon="plus" onAction={onProvisionTenant} />
-        <div className="settings-list">
-          <label>Gym name<input value="New Gym Lahore" readOnly /></label>
-          <label>Subdomain<input value="newgym-lhr.gymflow.pk" readOnly /></label>
-          <label>Plan<input value="Growth" readOnly /></label>
-          <label>Owner email<input value="owner@example.com" readOnly /></label>
+          <PanelHeader title="Onboard gym" action="Create" icon="plus" onAction={onProvisionTenant} />
+          <div className="settings-list">
+          <label>Gym name<input value="Ready for client input" readOnly /></label>
+          <label>Subdomain<input value="Generated during provisioning" readOnly /></label>
+          <label>Plan<input value="Selected during onboarding" readOnly /></label>
+          <label>Owner email<input value="Added by Super Admin" readOnly /></label>
           <label>Timezone<input value="Asia/Karachi" readOnly /></label>
         </div>
       </div>
@@ -2801,12 +2882,12 @@ function ReportsView({ role, session }: { role: LoginRole; session: AuthSession 
         ['Today collections', formatPKR(summary?.collectionsPkr ?? 0), 'Current shift and payment method breakdown'],
         ['Dues follow-up', String(summary?.outstandingDuesPkr ?? 0), 'Outstanding dues in tenant scope'],
         ['Upcoming renewals', String(summary?.renewalDueCount ?? 0), 'Next 30 days, branch scoped'],
-        ['My collections', 'PKR 41,200', 'Staff-visible collection history'],
+        ['My collections', formatPKR(summary?.collectionsPkr ?? 0), 'Payments recorded through this tenant portal'],
       ]
     : [
         ['Revenue by date', formatPKR(summary?.collectionsPkr ?? 0), 'Payment method breakdown'],
         ['Dues list', formatPKR(summary?.outstandingDuesPkr ?? 0), `${summary?.activeMembers ?? 0} active members`],
-        ['Staff collections', 'PKR 186,500', 'Top collector: Sana'],
+        ['Staff collections', formatPKR(summary?.collectionsPkr ?? 0), 'Collector split will populate after staff payments'],
         ['Upcoming renewals', String(summary?.renewalDueCount ?? 0), 'Next 30 days'],
         ['Suspended / cancelled', String(summary?.suspendedMembers ?? 0), 'Date range enabled'],
       ]
@@ -2978,7 +3059,7 @@ function SettingsView({ session }: { session: AuthSession }) {
       <div className="panel">
         <PanelHeader title="Gym profile" action="Save" icon="building" />
         <div className="settings-list">
-          <label>Gym name<input value="FitZone Karachi" readOnly /></label>
+          <label>Gym name<input value={session.workspace} readOnly /></label>
           <label>Timezone<input value="Asia/Karachi" readOnly /></label>
           <label>Currency<input value="PKR" readOnly /></label>
           <label>Session timeout<input value="8 hours" readOnly /></label>
@@ -3052,10 +3133,10 @@ function SettingsView({ session }: { session: AuthSession }) {
         </div>
       </div>
       <div className="panel">
-        <PanelHeader title="Integrations" action="Test" icon="settings" onAction={() => setIntegrationStatus('Provider checks passed for demo. WhatsApp, SMS, and email stubs are reachable.')} />
+        <PanelHeader title="Integrations" action="Test" icon="settings" onAction={() => setIntegrationStatus('Provider stubs are reachable. Live WhatsApp, SMS, and email keys are not configured yet.')} />
         <div className="settings-list">
-          <label>WhatsApp BSP<input value="360dialog" readOnly /></label>
-          <label>SMS sender<input value="GymFlow" readOnly /></label>
+          <label>WhatsApp BSP<input value="Not configured" readOnly /></label>
+          <label>SMS sender<input value="Not configured" readOnly /></label>
           <label>Email<input value="Phase 2 - inactive" readOnly /></label>
           <label>Data retention<input value="3 years, then anonymise PII" readOnly /></label>
         </div>

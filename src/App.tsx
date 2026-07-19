@@ -734,9 +734,9 @@ function LoginView({
         </div>
 
         <div className="login-field-stack">
-          <label>Login URL<input value={featuredOption.url} readOnly /></label>
-          <label>Email<input value={selectedPortal === 'super-admin' ? 'ops@gymflow.pk' : 'admin@fitzone.pk'} readOnly /></label>
-          <label>Password<input value="••••••••••" readOnly /></label>
+          <label>Login URL<HintInput placeholder="Login URL" detail={featuredOption.url} /></label>
+          <label>Email<HintInput placeholder="Email address" detail={selectedPortal === 'super-admin' ? 'ops@gymflow.pk' : 'admin@fitzone.pk'} /></label>
+          <label>Password<HintInput placeholder="Password" detail="Use the demo credential shared for this portal." /></label>
         </div>
 
         <div className="api-source-toggle" aria-label="Data source">
@@ -1329,13 +1329,13 @@ function AddMemberModal({
   const [form, setForm] = useState<CreateMemberInput>({
     name: '',
     phone: '',
-    branchName: 'Main Branch',
-    planName: 'Monthly Basic',
+    branchName: '',
+    planName: '',
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [createdMember, setCreatedMember] = useState<Member | null>(null)
-  const selectedPlanPrice = getPlanPrice(form.planName)
+  const selectedPlanPrice = form.planName ? getPlanPrice(form.planName) : 0
 
   function updateField(field: keyof CreateMemberInput, value: string) {
     setError('')
@@ -1345,8 +1345,8 @@ function AddMemberModal({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!form.name.trim() || !form.phone.trim()) {
-      setError('Full name and phone are required.')
+    if (!form.name.trim() || !form.phone.trim() || !form.branchName || !form.planName) {
+      setError('Full name, phone, branch, and plan are required.')
       return
     }
 
@@ -1383,15 +1383,16 @@ function AddMemberModal({
           <div className="form-grid">
             <label>
               Full name
-              <input value={form.name} onChange={(event) => updateField('name', event.target.value)} placeholder="e.g. Client Member Name" />
+              <input value={form.name} onChange={(event) => updateField('name', event.target.value)} placeholder="Member full name" title="Enter the member's full legal or display name." />
             </label>
             <label>
               Phone
-              <input value={form.phone} onChange={(event) => updateField('phone', event.target.value)} placeholder="+92 300 000 0000" />
+              <input value={form.phone} onChange={(event) => updateField('phone', event.target.value)} placeholder="Phone number" title="Use the member's WhatsApp/SMS reachable number." />
             </label>
             <label>
               Branch
-              <select value={form.branchName} onChange={(event) => updateField('branchName', event.target.value)}>
+              <select value={form.branchName} onChange={(event) => updateField('branchName', event.target.value)} title="Select the branch where this member is registered.">
+                <option value="" disabled>Select branch</option>
                 <option value="Main Branch">Main Branch</option>
                 <option value="DHA Branch">DHA Branch</option>
                 <option value="Gulberg">Gulberg</option>
@@ -1399,7 +1400,8 @@ function AddMemberModal({
             </label>
             <label>
               Plan
-              <select value={form.planName} onChange={(event) => updateField('planName', event.target.value)}>
+              <select value={form.planName} onChange={(event) => updateField('planName', event.target.value)} title="Select the membership plan for billing and renewal calculation.">
+                <option value="" disabled>Select plan</option>
                 <option value="Monthly Basic">Monthly Basic</option>
                 <option value="Monthly Pro">Monthly Pro</option>
                 <option value="Quarterly Elite">Quarterly Elite</option>
@@ -1410,7 +1412,7 @@ function AddMemberModal({
 
           <div className="enrollment-preview">
             <AppIcon name="user-plus" size={18} />
-            <span>{form.planName} starts active with {formatPKR(selectedPlanPrice)} outstanding.</span>
+            <span>{form.planName ? `${form.planName} starts active with ${formatPKR(selectedPlanPrice)} outstanding.` : 'Select a plan to preview the first outstanding amount.'}</span>
           </div>
 
           {error && (
@@ -1460,18 +1462,18 @@ function ProvisionTenantModal({
   const [form, setForm] = useState<ProvisionTenantInput>({
     name: '',
     slug: '',
-    planCode: 'growth',
+    planCode: '',
     adminName: '',
     adminEmail: '',
-    city: 'Karachi',
-    branchName: 'Main Branch',
+    city: '',
+    branchName: '',
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [result, setResult] = useState<Awaited<ReturnType<typeof gymFlowApi.platform.provisionTenant>> | null>(null)
 
   const domainPreview = form.slug ? `${form.slug}.gymflow.pk` : 'tenant.gymflow.pk'
-  const planPreview = form.planCode === 'professional' ? 'Professional' : 'Growth'
+  const planPreview = form.planCode === 'professional' ? 'Professional' : form.planCode === 'growth' ? 'Growth' : 'Select plan'
 
   function updateField(field: keyof ProvisionTenantInput, value: string) {
     setResult(null)
@@ -1481,8 +1483,8 @@ function ProvisionTenantModal({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!form.name.trim() || !form.slug.trim() || !form.adminName.trim() || !form.adminEmail.trim()) {
-      setError('Gym name, slug, admin name, and admin email are required.')
+    if (!form.name.trim() || !form.slug.trim() || !form.planCode || !form.adminName.trim() || !form.adminEmail.trim()) {
+      setError('Gym name, slug, plan, admin name, and admin email are required.')
       return
     }
 
@@ -1495,8 +1497,8 @@ function ProvisionTenantModal({
         slug: slugifyTenantName(form.slug),
         adminName: form.adminName.trim(),
         adminEmail: form.adminEmail.trim().toLowerCase(),
-        city: form.city.trim() || 'Karachi',
-        branchName: form.branchName.trim() || 'Main Branch',
+        city: form.city.trim(),
+        branchName: form.branchName.trim(),
       })
       setResult(provisioned)
     } catch (provisionError) {
@@ -1535,7 +1537,8 @@ function ProvisionTenantModal({
                     slug: current.slug ? current.slug : slugifyTenantName(nextName),
                   }))
                 }}
-                placeholder="Pulse Gym Islamabad"
+                placeholder="Gym name"
+                title="Enter the client gym or tenant workspace name."
               />
             </label>
             <label>
@@ -1543,37 +1546,39 @@ function ProvisionTenantModal({
               <input
                 value={form.slug}
                 onChange={(event) => updateField('slug', slugifyTenantName(event.target.value))}
-                placeholder="pulse-isb"
+                placeholder="tenant-slug"
+                title="Lowercase tenant identifier used for routing and database naming."
               />
             </label>
             <label>
               Plan
-              <select value={form.planCode} onChange={(event) => updateField('planCode', event.target.value)}>
+              <select value={form.planCode} onChange={(event) => updateField('planCode', event.target.value)} title="Choose the platform subscription plan for this tenant.">
+                <option value="" disabled>Select plan</option>
                 <option value="growth">Growth</option>
                 <option value="professional">Professional</option>
               </select>
             </label>
             <label>
               City
-              <input value={form.city} onChange={(event) => updateField('city', event.target.value)} placeholder="Karachi" />
+              <input value={form.city} onChange={(event) => updateField('city', event.target.value)} placeholder="City" title="City used for the tenant's first branch profile." />
             </label>
             <label>
               Admin name
-              <input value={form.adminName} onChange={(event) => updateField('adminName', event.target.value)} placeholder="Maham Khan" />
+              <input value={form.adminName} onChange={(event) => updateField('adminName', event.target.value)} placeholder="Admin full name" title="Name of the first tenant administrator." />
             </label>
             <label>
               Admin email
-              <input value={form.adminEmail} onChange={(event) => updateField('adminEmail', event.target.value)} placeholder="admin@pulse.pk" />
+              <input value={form.adminEmail} onChange={(event) => updateField('adminEmail', event.target.value)} placeholder="Admin email" title="Email address used by the first tenant administrator." />
             </label>
             <label className="wide-field">
               First branch
-              <input value={form.branchName} onChange={(event) => updateField('branchName', event.target.value)} placeholder="Main Branch" />
+              <input value={form.branchName} onChange={(event) => updateField('branchName', event.target.value)} placeholder="First branch name" title="Name of the first branch created during provisioning." />
             </label>
           </div>
 
           <div className="enrollment-preview provision-preview">
             <AppIcon name="building" size={18} />
-            <span>{domainPreview} · {planPreview} · {form.branchName || 'Main Branch'}</span>
+            <span>{domainPreview} · {planPreview} · {form.branchName || 'First branch'}</span>
           </div>
 
           {error && (
@@ -1711,6 +1716,18 @@ function InfoTile({ label, value }: { label: string; value: string }) {
   )
 }
 
+function HintInput({ placeholder, detail }: { placeholder: string; detail?: string }) {
+  return (
+    <input
+      value=""
+      readOnly
+      placeholder={placeholder}
+      title={detail ?? placeholder}
+      aria-label={placeholder}
+    />
+  )
+}
+
 function PaymentsView({
   members,
   session,
@@ -1726,7 +1743,7 @@ function PaymentsView({
   const [selectedMemberId, setSelectedMemberId] = useState(initialSelectedMemberId || members[0]?.id || '')
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('easypaisa')
   const [amountPaid, setAmountPaid] = useState('')
-  const [discount, setDiscount] = useState('0')
+  const [discount, setDiscount] = useState('')
   const [transactionId, setTransactionId] = useState('')
   const [isConfirmed, setIsConfirmed] = useState(false)
   const [paymentError, setPaymentError] = useState('')
@@ -1787,11 +1804,11 @@ function PaymentsView({
     const nextSelectedId = initialSelectedMemberId || selectedMemberId || members[0]?.id || ''
     const nextMember = members.find((member) => member.id === nextSelectedId)
     if (!nextMember) return
-    if (nextMember.id === selectedMemberId && amountPaid) return
+    if (nextMember.id === selectedMemberId) return
 
     setSelectedMemberId(nextMember.id)
-    setAmountPaid(String(nextMember.balance || getPlanPrice(nextMember.plan)))
-    setDiscount('0')
+    setAmountPaid('')
+    setDiscount('')
     setTransactionId('')
     setPaymentError('')
     setIsConfirmed(false)
@@ -1801,8 +1818,8 @@ function PaymentsView({
     const nextMember = members.find((member) => member.id === memberId) ?? members[0]
     if (!nextMember) return
     setSelectedMemberId(memberId)
-    setAmountPaid(String(nextMember.balance || getPlanPrice(nextMember.plan)))
-    setDiscount('0')
+    setAmountPaid('')
+    setDiscount('')
     setTransactionId('')
     setPaymentError('')
     setIsConfirmed(false)
@@ -1903,10 +1920,10 @@ function PaymentsView({
           </div>
 
           <div className="form-grid">
-            <label>Current outstanding<input value={currentOutstanding} readOnly /></label>
-            <label>Late fee<input value={lateFee} readOnly /></label>
-            <label>Discount<input value={discount} onChange={(event) => setDiscount(event.target.value)} inputMode="numeric" /></label>
-            <label>Amount paid<input value={amountPaid} onChange={(event) => setAmountPaid(event.target.value)} inputMode="numeric" /></label>
+            <label>Current outstanding<HintInput placeholder={selectedMember ? formatPKR(currentOutstanding) : 'Select member'} detail={selectedMember ? `Current outstanding is ${formatPKR(currentOutstanding)}.` : 'Select a member to calculate outstanding dues.'} /></label>
+            <label>Late fee<HintInput placeholder={selectedMember ? formatPKR(lateFee) : 'Select member'} detail={selectedMember ? `Late fee is ${formatPKR(lateFee)}.` : 'Select a member to calculate late fee.'} /></label>
+            <label>Discount<input value={discount} onChange={(event) => setDiscount(event.target.value)} inputMode="numeric" placeholder="Discount amount" title="Optional discount amount in PKR. Leave empty for zero discount." /></label>
+            <label>Amount paid<input value={amountPaid} onChange={(event) => setAmountPaid(event.target.value)} inputMode="numeric" placeholder={selectedMember ? formatPKR(currentOutstanding) : 'Amount paid'} title={selectedMember ? `Suggested full payment is ${formatPKR(currentOutstanding)}.` : 'Enter the payment amount collected.'} /></label>
             <label>Method
               <select
                 value={paymentMethod}
@@ -1927,6 +1944,7 @@ function PaymentsView({
                 value={transactionId}
                 onChange={(event) => setTransactionId(event.target.value)}
                 placeholder={requiresTransactionId ? 'Required for digital payments' : 'Not required for cash'}
+                title={requiresTransactionId ? 'Enter gateway transaction/reference ID for digital payments.' : 'Cash payments can be recorded without a transaction ID.'}
               />
             </label>
           </div>
@@ -2765,11 +2783,11 @@ function SuperAdminProvisioning({ onProvisionTenant }: { onProvisionTenant: () =
       <div className="panel">
           <PanelHeader title="Onboard gym" action="Create" icon="plus" onAction={onProvisionTenant} />
           <div className="settings-list">
-          <label>Gym name<input value="Ready for client input" readOnly /></label>
-          <label>Subdomain<input value="Generated during provisioning" readOnly /></label>
-          <label>Plan<input value="Selected during onboarding" readOnly /></label>
-          <label>Owner email<input value="Added by Super Admin" readOnly /></label>
-          <label>Timezone<input value="Asia/Karachi" readOnly /></label>
+          <label>Gym name<HintInput placeholder="Gym name" detail="Entered by Super Admin while creating a tenant." /></label>
+          <label>Subdomain<HintInput placeholder="Subdomain" detail="Generated from the tenant slug during provisioning." /></label>
+          <label>Plan<HintInput placeholder="Subscription plan" detail="Selected during tenant onboarding." /></label>
+          <label>Owner email<HintInput placeholder="Owner email" detail="Added by Super Admin during onboarding." /></label>
+          <label>Timezone<HintInput placeholder="Timezone" detail="Default timezone is Asia/Karachi." /></label>
         </div>
       </div>
 
@@ -2824,19 +2842,19 @@ function SuperAdminSettings({ session }: { session: AuthSession }) {
       <div className="panel">
         <PanelHeader title="Platform access" action="Save" icon="shield" />
         <div className="settings-list">
-          <label>Super Admin URL<input value="app.gymflow.pk" readOnly /></label>
-          <label>Tenant URL pattern<input value="{tenant}.gymflow.pk" readOnly /></label>
-          <label>MFA policy<input value="Required for all platform admins" readOnly /></label>
-          <label>Session timeout<input value="4 hours" readOnly /></label>
+          <label>Super Admin URL<HintInput placeholder="Super Admin URL" detail="app.gymflow.pk" /></label>
+          <label>Tenant URL pattern<HintInput placeholder="Tenant URL pattern" detail="{tenant}.gymflow.pk" /></label>
+          <label>MFA policy<HintInput placeholder="MFA policy" detail="Required for all platform admins." /></label>
+          <label>Session timeout<HintInput placeholder="Session timeout" detail="4 hours." /></label>
         </div>
       </div>
       <div className="panel">
         <PanelHeader title="Central services" action="Test" icon="settings" onAction={() => setServiceStatus('Central services reachable. Billing, provisioning, stats sync, and audit retention are ready for demo.')} />
         <div className="settings-list">
-          <label>Billing<input value="Enabled" readOnly /></label>
-          <label>Tenant stats sync<input value="Nightly at 2:00 AM PKT" readOnly /></label>
-          <label>Provisioning queue<input value="Enabled" readOnly /></label>
-          <label>Audit retention<input value="7 years" readOnly /></label>
+          <label>Billing<HintInput placeholder="Billing status" detail="Enabled." /></label>
+          <label>Tenant stats sync<HintInput placeholder="Stats sync schedule" detail="Nightly at 2:00 AM PKT." /></label>
+          <label>Provisioning queue<HintInput placeholder="Provisioning queue" detail="Enabled." /></label>
+          <label>Audit retention<HintInput placeholder="Audit retention" detail="7 years." /></label>
         </div>
         {serviceStatus && (
           <div className="success-banner compact">
@@ -2940,8 +2958,8 @@ function ReportsView({ role, session }: { role: LoginRole; session: AuthSession 
 function SettingsView({ session }: { session: AuthSession }) {
   const [settings, setSettings] = useState<TenantSettings | null>(null)
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([])
-  const [branchName, setBranchName] = useState('North Nazimabad')
-  const [planName, setPlanName] = useState('Monthly Plus')
+  const [branchName, setBranchName] = useState('')
+  const [planName, setPlanName] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
   const [auditError, setAuditError] = useState('')
@@ -2992,6 +3010,7 @@ function SettingsView({ session }: { session: AuthSession }) {
     try {
       const result = await gymFlowApi.tenant.createBranch(session, { name: branchName.trim(), city: 'Karachi' })
       setSettings((current) => current ? { ...current, branches: [result.branch, ...current.branches] } : current)
+      setBranchName('')
       await refreshAuditLogs()
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Unable to add branch.')
@@ -3012,6 +3031,7 @@ function SettingsView({ session }: { session: AuthSession }) {
         graceDays: 3,
       })
       setSettings((current) => current ? { ...current, membershipPlans: [result.plan, ...current.membershipPlans] } : current)
+      setPlanName('')
       await refreshAuditLogs()
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Unable to add membership plan.')
@@ -3059,10 +3079,10 @@ function SettingsView({ session }: { session: AuthSession }) {
       <div className="panel">
         <PanelHeader title="Gym profile" action="Save" icon="building" />
         <div className="settings-list">
-          <label>Gym name<input value={session.workspace} readOnly /></label>
-          <label>Timezone<input value="Asia/Karachi" readOnly /></label>
-          <label>Currency<input value="PKR" readOnly /></label>
-          <label>Session timeout<input value="8 hours" readOnly /></label>
+          <label>Gym name<HintInput placeholder="Gym name" detail={session.workspace} /></label>
+          <label>Timezone<HintInput placeholder="Timezone" detail="Asia/Karachi" /></label>
+          <label>Currency<HintInput placeholder="Currency" detail="PKR" /></label>
+          <label>Session timeout<HintInput placeholder="Session timeout" detail="8 hours" /></label>
         </div>
       </div>
       <div className="panel">
@@ -3089,7 +3109,7 @@ function SettingsView({ session }: { session: AuthSession }) {
       <div className="panel">
         <PanelHeader title="Branches" action="Add" icon="plus" onAction={canManageSettings ? addBranch : undefined} />
         <div className="settings-list">
-          <label>New branch<input value={branchName} onChange={(event) => setBranchName(event.target.value)} readOnly={!canManageSettings} /></label>
+          <label>New branch<input value={branchName} onChange={(event) => setBranchName(event.target.value)} readOnly={!canManageSettings} placeholder="Branch name" title="Enter a new branch name, then press Add." /></label>
         </div>
         <div className="profile-list">
           {(settings?.branches ?? []).map((branch) => (
@@ -3112,7 +3132,7 @@ function SettingsView({ session }: { session: AuthSession }) {
       <div className="panel">
         <PanelHeader title="Membership plans" action={isSaving ? 'Saving' : 'Add'} icon="badge" onAction={canManageSettings ? addPlan : undefined} />
         <div className="settings-list">
-          <label>New plan<input value={planName} onChange={(event) => setPlanName(event.target.value)} readOnly={!canManageSettings} /></label>
+          <label>New plan<input value={planName} onChange={(event) => setPlanName(event.target.value)} readOnly={!canManageSettings} placeholder="Plan name" title="Enter a membership plan name, then press Add." /></label>
         </div>
         <div className="profile-list">
           {(settings?.membershipPlans ?? []).map((plan) => (
@@ -3135,10 +3155,10 @@ function SettingsView({ session }: { session: AuthSession }) {
       <div className="panel">
         <PanelHeader title="Integrations" action="Test" icon="settings" onAction={() => setIntegrationStatus('Provider stubs are reachable. Live WhatsApp, SMS, and email keys are not configured yet.')} />
         <div className="settings-list">
-          <label>WhatsApp BSP<input value="Not configured" readOnly /></label>
-          <label>SMS sender<input value="Not configured" readOnly /></label>
-          <label>Email<input value="Phase 2 - inactive" readOnly /></label>
-          <label>Data retention<input value="3 years, then anonymise PII" readOnly /></label>
+          <label>WhatsApp BSP<HintInput placeholder="WhatsApp provider" detail="Not configured." /></label>
+          <label>SMS sender<HintInput placeholder="SMS sender" detail="Not configured." /></label>
+          <label>Email<HintInput placeholder="Email status" detail="Phase 2 - inactive." /></label>
+          <label>Data retention<HintInput placeholder="Data retention" detail="3 years, then anonymise PII." /></label>
         </div>
         {integrationStatus && (
           <div className="success-banner compact">

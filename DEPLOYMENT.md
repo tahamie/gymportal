@@ -33,9 +33,12 @@ For deployment, serve `dist/` with a static web server or CDN.
 Set the backend API URL at build/runtime using:
 
 ```bash
-VITE_GYMFLOW_API_BASE_URL=https://api.your-domain.com
+VITE_GYMFLOW_API_BASE_URL=/api
 VITE_GYMFLOW_API_MODE=backend
+VITE_GYMFLOW_ALLOW_MOCK=false
 ```
+
+If the backend is hosted on a separate subdomain instead of a reverse proxy path, use that full API origin, for example `https://api.your-domain.com`.
 
 ## Backend
 
@@ -84,6 +87,7 @@ For PostgreSQL mode, configure:
 
 ```bash
 GYMFLOW_REPOSITORY=postgres
+GYMFLOW_SEED_DEMO_DATA=false
 GYMFLOW_CENTRAL_DATABASE_URL=postgres://USER:PASSWORD@HOST:5432/gymflow_central
 GYMFLOW_POSTGRES_ADMIN_URL=postgres://ADMIN:PASSWORD@HOST:5432/postgres
 GYMFLOW_TENANT_DATABASE_URL_TEMPLATE=postgres://USER:PASSWORD@HOST:5432/{database}
@@ -95,7 +99,13 @@ Then run:
 npm run backend:seed-postgres
 ```
 
-The seed script applies central and tenant schema setup and demo data for the current MVP.
+The seed script applies central and tenant schema setup. It keeps member/payment data empty unless `GYMFLOW_SEED_DEMO_DATA=true` is explicitly set.
+
+To remove demo business rows from an already-seeded database while keeping login users, tenant setup, branches, plans, and notification templates:
+
+```bash
+npm run backend:clean-postgres
+```
 
 For local database smoke testing:
 

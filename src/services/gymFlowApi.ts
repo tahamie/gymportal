@@ -102,16 +102,27 @@ type ProvisionTenantResponse = {
 const apiModeKey = 'gymflow-api-mode'
 const mockMembersKeyPrefix = 'gymflow-mock-members'
 const mockBillingInvoicesKey = 'gymflow-mock-billing-invoices'
-const apiBaseUrl = import.meta.env.VITE_GYMFLOW_API_BASE_URL ?? 'http://127.0.0.1:4100'
+const apiBaseUrl = import.meta.env.VITE_GYMFLOW_API_BASE_URL ?? (import.meta.env.DEV ? 'http://127.0.0.1:4100' : '/api')
+
+function isMockModeAllowed() {
+  return import.meta.env.DEV || import.meta.env.VITE_GYMFLOW_ALLOW_MOCK === 'true'
+}
 
 export function getStoredApiMode(): ApiMode {
   const storedMode = window.localStorage.getItem(apiModeKey)
-  if (storedMode === 'backend' || storedMode === 'mock') return storedMode
+  if (storedMode === 'mock' && isMockModeAllowed()) return storedMode
+  if (storedMode === 'backend') return storedMode
+  if (!isMockModeAllowed()) return 'backend'
   return import.meta.env.VITE_GYMFLOW_API_MODE === 'mock' ? 'mock' : 'backend'
 }
 
 export function storeApiMode(mode: ApiMode) {
+  if (mode === 'mock' && !isMockModeAllowed()) return
   window.localStorage.setItem(apiModeKey, mode)
+}
+
+export function getApiBaseUrl() {
+  return apiBaseUrl
 }
 
 function toDateLabel(value: string) {
@@ -388,7 +399,14 @@ async function requestBackend<T>(path: string, options: RequestInit = {}) {
       },
     })
   } catch {
-    throw new Error(`Local API is not reachable at ${apiBaseUrl}. Start the backend or switch to Demo mock.`)
+    throw new Error(`API is not reachable at ${apiBaseUrl}. Check backend service and reverse proxy.`)
+  }
+
+  const contentType = response.headers.get('content-type') ?? ''
+  if (!contentType.includes('application/json')) {
+    const body = await response.text()
+    const responseHint = body.trim().startsWith('<') ? 'HTML' : 'non-JSON'
+    throw new Error(`API returned ${responseHint} instead of JSON from ${apiBaseUrl}${path}. Check API URL/proxy configuration.`)
   }
 
   const payload = await response.json() as ApiResponse<T>
@@ -414,6 +432,8 @@ export const gymFlowApi = {
   mode: {
     get: getStoredApiMode,
     set: storeApiMode,
+    baseUrl: getApiBaseUrl,
+    isMockAllowed: isMockModeAllowed,
   },
   auth: {
     listLoginOptions: () => mockGymFlowApi.auth.listLoginOptions(),

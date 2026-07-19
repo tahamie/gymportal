@@ -46,6 +46,10 @@ function tenantConnectionString(databaseName: string) {
     .replaceAll('{database}', databaseName)
 }
 
+function shouldSeedDemoData() {
+  return process.env.GYMFLOW_SEED_DEMO_DATA === 'true'
+}
+
 async function runSchema(pool: Pool, fileName: string) {
   const schema = readFileSync(join(process.cwd(), 'backend/db', fileName), 'utf8')
   await pool.query(schema)
@@ -103,8 +107,7 @@ async function seedCentral(pool: Pool) {
         primary_domain
       )
       values
-        ($1, 'FitZone Karachi', 'fitzone-khi', 'active', $2, 'tenant_fitzone_khi', 'fitzone-khi.gymflow.pk'),
-        ($3, 'Iron Temple Lahore', 'irontemple-lhr', 'trial', $4, 'tenant_irontemple_lhr', 'irontemple-lhr.gymflow.pk')
+        ($1, 'FitZone Karachi', 'fitzone-khi', 'active', $2, 'tenant_fitzone_khi', 'fitzone-khi.gymflow.pk')
       on conflict (slug) do update
       set name = excluded.name,
           status = excluded.status,
@@ -113,7 +116,33 @@ async function seedCentral(pool: Pool) {
           primary_domain = excluded.primary_domain,
           updated_at = now()
     `,
-    [ids.fitzoneTenant, ids.growthPlan, ids.irontempleTenant, ids.professionalPlan],
+    [ids.fitzoneTenant, ids.growthPlan],
+  )
+
+  if (!shouldSeedDemoData()) return
+
+  await pool.query(
+    `
+      insert into tenants (
+        id,
+        name,
+        slug,
+        status,
+        plan_id,
+        database_name,
+        primary_domain
+      )
+      values
+        ($1, 'Iron Temple Lahore', 'irontemple-lhr', 'trial', $2, 'tenant_irontemple_lhr', 'irontemple-lhr.gymflow.pk')
+      on conflict (slug) do update
+      set name = excluded.name,
+          status = excluded.status,
+          plan_id = excluded.plan_id,
+          database_name = excluded.database_name,
+          primary_domain = excluded.primary_domain,
+          updated_at = now()
+    `,
+    [ids.irontempleTenant, ids.professionalPlan],
   )
 
   await pool.query(
@@ -192,6 +221,23 @@ async function seedFitZoneTenant(pool: Pool) {
     `,
     [ids.monthlyBasicPlan, ids.monthlyProPlan, ids.quarterlyElitePlan, ids.annualElitePlan],
   )
+
+  await pool.query(
+    `
+      insert into notification_templates (id, trigger_code, purpose, body)
+      values
+        ($1, 'due_3_days', 'Renewal reminder', 'Hi {{memberName}}, your GymFlow membership is due on {{dueDate}}.'),
+        ($2, 'overdue', 'Overdue reminder', 'Hi {{memberName}}, your membership payment is overdue. Please clear PKR {{balance}}.')
+      on conflict (trigger_code) do update
+      set purpose = excluded.purpose,
+          body = excluded.body,
+          is_active = true,
+          updated_at = now()
+    `,
+    [ids.templateDueSoon, ids.templateOverdue],
+  )
+
+  if (!shouldSeedDemoData()) return
 
   await pool.query(
     `
@@ -283,21 +329,6 @@ async function seedFitZoneTenant(pool: Pool) {
           updated_at = now()
     `,
     [ids.renewalAli, ids.aliRaza, ids.renewalHira, ids.hiraKhan, ids.renewalUsman, ids.usmanMalik],
-  )
-
-  await pool.query(
-    `
-      insert into notification_templates (id, trigger_code, purpose, body)
-      values
-        ($1, 'due_3_days', 'Renewal reminder', 'Hi {{memberName}}, your GymFlow membership is due on {{dueDate}}.'),
-        ($2, 'overdue', 'Overdue reminder', 'Hi {{memberName}}, your membership payment is overdue. Please clear PKR {{balance}}.')
-      on conflict (trigger_code) do update
-      set purpose = excluded.purpose,
-          body = excluded.body,
-          is_active = true,
-          updated_at = now()
-    `,
-    [ids.templateDueSoon, ids.templateOverdue],
   )
 }
 

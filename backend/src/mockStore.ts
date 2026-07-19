@@ -45,15 +45,6 @@ export const tenants: TenantRecord[] = [
     databaseName: 'tenant_fitzone_khi',
     primaryDomain: 'fitzone-khi.gymflow.pk',
   },
-  {
-    id: 'tenant_irontemple_lhr',
-    name: 'Iron Temple Lahore',
-    slug: 'irontemple-lhr',
-    status: 'trial',
-    plan: 'Professional',
-    databaseName: 'tenant_irontemple_lhr',
-    primaryDomain: 'irontemple-lhr.gymflow.pk',
-  },
 ]
 
 export const subscriptionPlans: SubscriptionPlanRecord[] = [
@@ -95,50 +86,7 @@ export const subscriptionPlans: SubscriptionPlanRecord[] = [
   },
 ]
 
-const fitZoneMembers: MemberRecord[] = [
-  {
-    id: 'mem_ali_raza',
-    memberCode: 'GF-2026-00284',
-    name: 'Ali Raza',
-    phone: '+92 300 129 8821',
-    branchId: 'br_dha',
-    branchName: 'DHA Branch',
-    planId: 'plan_monthly_pro',
-    planName: 'Monthly Pro',
-    status: 'active',
-    currentBalancePkr: 0,
-    dueDate: '2026-07-22',
-    lastPaymentDate: '2026-07-10',
-  },
-  {
-    id: 'mem_hira_khan',
-    memberCode: 'GF-2026-00285',
-    name: 'Hira Khan',
-    phone: '+92 321 663 4481',
-    branchId: 'br_main',
-    branchName: 'Main Branch',
-    planId: 'plan_monthly_basic',
-    planName: 'Monthly Basic',
-    status: 'balance_due',
-    currentBalancePkr: 1700,
-    dueDate: '2026-07-13',
-    lastPaymentDate: '2026-07-08',
-  },
-  {
-    id: 'mem_usman_malik',
-    memberCode: 'GF-2026-00286',
-    name: 'Usman Malik',
-    phone: '+92 333 554 1187',
-    branchId: 'br_gulberg',
-    branchName: 'Gulberg',
-    planId: 'plan_quarterly_elite',
-    planName: 'Quarterly Elite',
-    status: 'dues_pending',
-    currentBalancePkr: 3500,
-    dueDate: '2026-07-10',
-    lastPaymentDate: '2026-06-09',
-  },
-]
+const fitZoneMembers: MemberRecord[] = []
 
 export const defaultBranches: BranchRecord[] = [
   { id: 'br_main', name: 'Main Branch', city: 'Karachi', address: 'Main Boulevard', isActive: true },
@@ -158,15 +106,6 @@ export const tenantStores = new Map<string, TenantStore>([
     'tenant_fitzone_khi',
     {
       members: fitZoneMembers,
-      payments: [] satisfies PaymentRecord[],
-      branches: defaultBranches,
-      membershipPlans: defaultMembershipPlans,
-    },
-  ],
-  [
-    'tenant_irontemple_lhr',
-    {
-      members: [],
       payments: [] satisfies PaymentRecord[],
       branches: defaultBranches,
       membershipPlans: defaultMembershipPlans,

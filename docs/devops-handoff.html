@@ -529,8 +529,8 @@ npm run backend:test</code></pre>
               </tr>
               <tr>
                 <td><code>VITE_GYMFLOW_API_BASE_URL</code></td>
-                <td>Frontend API base URL.</td>
-                <td><code>https://api.your-domain.com</code></td>
+                <td>Frontend API base URL. Prefer reverse proxy path for same-domain deployment.</td>
+                <td><code>/api</code></td>
               </tr>
               <tr>
                 <td><code>VITE_GYMFLOW_API_MODE</code></td>
@@ -541,6 +541,11 @@ npm run backend:test</code></pre>
                 <td><code>GYMFLOW_REPOSITORY</code></td>
                 <td>Persistence mode.</td>
                 <td><code>postgres</code></td>
+              </tr>
+              <tr>
+                <td><code>GYMFLOW_SEED_DEMO_DATA</code></td>
+                <td>Whether seed script creates fake members/payments. Keep false for client demo entry testing.</td>
+                <td><code>false</code></td>
               </tr>
               <tr>
                 <td><code>GYMFLOW_CENTRAL_DATABASE_URL</code></td>
@@ -582,13 +587,16 @@ npm run backend:test</code></pre>
             <li>Apply <code>backend/db/central.sql</code> to the central database.</li>
             <li>Apply <code>backend/db/tenant.sql</code> to every tenant database.</li>
             <li>Set all <code>GYMFLOW_*</code> environment variables.</li>
-            <li>For demo/UAT only, run the seed script.</li>
+            <li>For demo/UAT, run the seed script with <code>GYMFLOW_SEED_DEMO_DATA=false</code>.</li>
           </ol>
 
           <pre><code>npm run backend:seed-postgres</code></pre>
 
+          <p>To remove fake members/payments from an existing seeded database:</p>
+          <pre><code>npm run backend:clean-postgres</code></pre>
+
           <div class="callout danger">
-            Production should not use demo passwords. Seed data is for mock run/UAT only.
+            Production should not use demo passwords. The default seed is now clean and does not create fake members or payments.
           </div>
         </section>
 

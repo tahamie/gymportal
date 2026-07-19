@@ -443,7 +443,7 @@ function App() {
             <strong>{session.name}</strong>
             <small>{session.title} · {session.url}</small>
             <span className={session.apiMode === 'backend' ? 'mode-pill backend' : 'mode-pill mock'}>
-              {session.apiMode === 'backend' ? 'Local API' : 'Demo mock'}
+              {session.apiMode === 'backend' ? 'Server API' : 'Demo mock'}
             </span>
           </div>
           <small>{isSuperAdmin ? 'Central controls only. Tenant data stays isolated.' : 'Gym staff workspace. Tenant database only.'}</small>
@@ -667,6 +667,7 @@ function LoginView({
   const [isSigningIn, setIsSigningIn] = useState(false)
   const options = loginOptions.filter((option) => option.portal === selectedPortal)
   const featuredOption = options[0]
+  const allowMockMode = gymFlowApi.mode.isMockAllowed()
 
   async function handleLogin(option: AuthSession) {
     setIsSigningIn(true)
@@ -750,17 +751,19 @@ function LoginView({
               onClick={() => onApiModeChange('backend')}
               type="button"
             >
-              Local API
+              Server API
             </button>
-            <button
-              className={apiMode === 'mock' ? 'selected' : ''}
-              onClick={() => onApiModeChange('mock')}
-              type="button"
-            >
-              Demo mock
-            </button>
+            {allowMockMode && (
+              <button
+                className={apiMode === 'mock' ? 'selected' : ''}
+                onClick={() => onApiModeChange('mock')}
+                type="button"
+              >
+                Demo mock
+              </button>
+            )}
           </div>
-          <small>{apiMode === 'backend' ? 'Persistent local backend · http://127.0.0.1:4100' : 'Demo fallback · browser-only data'}</small>
+          <small>{apiMode === 'backend' ? `Persistent backend · ${gymFlowApi.mode.baseUrl()}` : 'Demo fallback · browser-only data'}</small>
         </div>
 
         {loginError && <div className="login-error">{loginError}</div>}

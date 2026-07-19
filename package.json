@@ -8,6 +8,7 @@
     "build": "vite build",
     "backend:build": "tsc -p tsconfig.backend.json",
     "backend:reset-db": "node backend/dist/scripts/resetDevDb.js",
+    "backend:clean-postgres": "npm run backend:build && node backend/dist/scripts/cleanPostgresData.js",
     "backend:seed-postgres": "npm run backend:build && node backend/dist/scripts/seedPostgres.js",
     "backend:start": "node backend/dist/server.js",
     "backend:test": "node --test backend/dist/tests/*.test.js",

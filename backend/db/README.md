@@ -23,7 +23,6 @@ The local bootstrap creates:
 
 - `gymflow_central`
 - `tenant_fitzone_khi`
-- `tenant_irontemple_lhr`
 
 ## Production / UAT Setup
 
@@ -40,6 +39,18 @@ Run the seed only for demo/UAT:
 
 ```bash
 npm run backend:seed-postgres
+```
+
+By default, the seed creates clean setup data only: tenant, users, branches, plans, and notification templates. It does not create fake members/payments unless explicitly enabled:
+
+```bash
+GYMFLOW_SEED_DEMO_DATA=true npm run backend:seed-postgres
+```
+
+To clean fake business rows from an existing database:
+
+```bash
+npm run backend:clean-postgres
 ```
 
 For production, apply `central.sql` to the central DB and `tenant.sql` to every tenant DB, then create real users/passwords through the application flow or an approved provisioning script.

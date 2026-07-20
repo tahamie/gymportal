@@ -198,8 +198,28 @@ function isSuperAdminPage(value: string | undefined): value is SuperAdminPage {
   return superAdminPageIds.includes(value as SuperAdminPage)
 }
 
+function appBasePath() {
+  const baseUrl = import.meta.env.BASE_URL ?? '/'
+  if (baseUrl === '/') return ''
+  return baseUrl.replace(/\/$/, '')
+}
+
+function pathWithoutBase(pathname: string) {
+  const basePath = appBasePath()
+  if (!basePath) return pathname
+  if (pathname === basePath) return '/'
+  if (pathname.startsWith(`${basePath}/`)) return pathname.slice(basePath.length) || '/'
+  return pathname
+}
+
+function pathWithBase(pathname: string) {
+  const basePath = appBasePath()
+  if (!basePath) return pathname
+  return pathname === '/' ? `${basePath}/` : `${basePath}${pathname}`
+}
+
 function readRoute(): AppRoute {
-  const [, portalSegment, pageSegment] = window.location.pathname.split('/')
+  const [, portalSegment, pageSegment] = pathWithoutBase(window.location.pathname).split('/')
 
   if (portalSegment === 'tenant' && isTenantPage(pageSegment)) {
     return { portal: 'tenant', tenantPage: pageSegment, superPage: 'platform-dashboard' }
@@ -213,9 +233,9 @@ function readRoute(): AppRoute {
 }
 
 function routePath(portal: Portal | null, page?: TenantPage | SuperAdminPage) {
-  if (portal === 'tenant') return `/tenant/${page ?? 'dashboard'}`
-  if (portal === 'super-admin') return `/super-admin/${page ?? 'platform-dashboard'}`
-  return '/login'
+  if (portal === 'tenant') return pathWithBase(`/tenant/${page ?? 'dashboard'}`)
+  if (portal === 'super-admin') return pathWithBase(`/super-admin/${page ?? 'platform-dashboard'}`)
+  return pathWithBase('/')
 }
 
 function pushRoute(portal: Portal | null, page?: TenantPage | SuperAdminPage) {
@@ -258,10 +278,24 @@ function clearStoredSession() {
   window.localStorage.removeItem(activeSessionKey)
 }
 
+function readInitialSession(route: AppRoute) {
+  if (!route.portal) {
+    clearStoredSession()
+    return null
+  }
+
+  const storedSession = readStoredSession()
+  if (!storedSession || storedSession.portal !== route.portal) {
+    clearStoredSession()
+    return null
+  }
+  return storedSession
+}
+
 function App() {
   const [route, setRoute] = useState<AppRoute>(() => readRoute())
-  const [session, setSession] = useState<AuthSession | null>(() => readStoredSession())
-  const [isRestoringSession, setIsRestoringSession] = useState(() => readStoredSession() !== null)
+  const [session, setSession] = useState<AuthSession | null>(() => readInitialSession(readRoute()))
+  const [isRestoringSession, setIsRestoringSession] = useState(() => readInitialSession(readRoute()) !== null)
   const [apiMode, setApiMode] = useState<ApiMode>(() => gymFlowApi.mode.get())
   const [membersData, setMembersData] = useState<Member[]>(members)
   const [tenantRows, setTenantRows] = useState(tenants)
